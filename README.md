@@ -48,9 +48,14 @@ no source in the repo — editing it meant hand-patching a generated blob. `src/
 recovered from that bundle by splitting it at its component boundaries.
 
 **The recovery is provably lossless:** `build.py --check` re-derives the bundle from
-`src/` and compares it to the committed file. At the time of recovery it was
-**byte-for-byte identical** (128,251 chars). If you ever doubt that `src/` is the real
-source of what ships, run that command.
+`src/` and compares it to the committed file, and it was **byte-for-byte identical** at
+the moment of recovery. If you ever doubt that `src/` is the real source of what ships,
+run that command — it answers for the bundle as it is *now*, which is the only version
+the question is ever really about.
+
+(An earlier draft of this README quoted the exact character count. It went stale within
+one commit, because the count changes every time anything is edited. A number a human has
+to remember to update is not documentation of a live property — the command is.)
 
 ## Two things that will silently break the site
 

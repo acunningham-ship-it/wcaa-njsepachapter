@@ -32,6 +32,7 @@ list of sections, and each section is a list of blocks.
 | `cards` | a grid of cards, marked with an `icon` or a `number` |
 | `events` | dated event cards |
 | `gallery` | a photo grid |
+| `image` | a single photo |
 | `list` | an icon-bulleted list |
 | `officers` | officer photo/initials, role, phone |
 | `iconRows` | icon + text rows, `stack` or `inline` |
@@ -43,6 +44,72 @@ An **unrecognised block type renders nothing at all**. That is deliberate — th
 is edited through a CMS, so an unknown type is either a typo or an injection attempt,
 and both should be inert. The trade-off is that a typo makes a section vanish silently,
 which is why `tools/test-pages.mjs` asserts a landmark string from every page.
+
+### Editing it without touching a file
+
+`admin/` is the site manager. An officer signs in, adds a page, adds and reorders
+blocks, edits their fields, sees a live preview, and presses **Save changes**.
+
+Save goes to `POST /api/save`, which validates the content, regenerates every page,
+and commits the whole set — content and HTML — as **one** commit. One commit means
+one Cloudflare Pages build and no window where the committed content and the
+committed HTML disagree with each other.
+
+The preview is rendered by `js/blocks.js`, the same module the Worker runs at save
+time. That is what the dual-runtime test is for: what the officer sees before saving
+is produced by the identical code that produces what ships.
+
+The editor's forms are generated from `admin/fields.js`, a table of what each block
+offers. `tools/test-admin.mjs` asserts that table covers every block type the
+renderer knows — so adding a block and forgetting the editor is a failing test
+rather than a capability that quietly doesn't exist.
+
+⛔ **Nothing in `admin/` is a security control.** Every check there is a courtesy to
+the person using it; `functions/api/save.js` trusts none of it. If the two disagree,
+the endpoint is right.
+
+## The API
+
+| endpoint | who | what |
+|---|---|---|
+| `POST /api/login` | public | sign in, sets a 12h session cookie |
+| `GET /api/session` | anyone | am I signed in? |
+| `POST /api/save` | officer | validate, regenerate, commit — one commit |
+| `POST /api/upload` | officer | add a photo to `uploads/` |
+| `POST /api/rsvp` | **public** | register for an event |
+| `POST /api/contact` | **public** | the contact form |
+| `GET/POST /api/events` | officer | open, cap and close registration |
+| `GET /api/rsvps` | officer | the registration list (`?format=csv`) |
+| `POST /api/rsvps/delete` | officer | remove a registration |
+| `GET/POST /api/messages` | officer | read, mark handled, delete |
+| `GET/POST /api/migrate` | officer | check / apply the database schema |
+
+**The two public endpoints make zero GitHub calls.** Everything else on this site
+commits to a public repo; the bodies of those two requests are a stranger's name,
+email and phone number, and committing that would publish it permanently — it stays
+in the git history after any later deletion. Those rows go to D1 and nowhere else.
+`tools/test-rsvp.mjs` records every outbound fetch and fails if `api.github.com`
+appears.
+
+**Turnstile fails closed.** With no `TURNSTILE_SECRET` the public endpoints refuse
+rather than skip verification, and they refuse when the network to Cloudflare fails
+too. "The captcha is skipped when the key is missing" is how a bot wall gets silently
+disabled for a month.
+
+**The RSVP and contact forms need JavaScript**, because the Turnstile widget does.
+The six content pages ship none.
+
+### Setting up the database
+
+The schema is not created on first request — an unauthenticated stranger's RSVP is
+the wrong thing to be triggering `CREATE TABLE`. Apply it deliberately, either way:
+
+```bash
+npx wrangler d1 execute wcaa-rsvps --remote --file=migrations/0001_rsvps.sql
+```
+
+...or sign in and `POST /api/migrate`, which runs the same file and then reports
+which tables actually exist rather than that the statements were sent.
 
 ### The old React prototype
 
@@ -101,6 +168,7 @@ to remember to update is not documentation of a live property — the command is
 Every page was screenshotted from the React prototype and from the generated static
 page at 1280×DPR1 and compared pixel by pixel. **Five of the six pages match at zero
 pixels; `about.html` differs by 642 px, and that difference is intended** — see below.
+(`404.html` has no counterpart in the prototype; it was added afterwards.)
 
 Photographs are compared separately, with every image hidden but its box preserved,
 because they cannot match byte-for-byte and the reason is not a defect: the prototype

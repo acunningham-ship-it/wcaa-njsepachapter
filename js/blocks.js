@@ -27,7 +27,11 @@ const SPACE = /^var\(--space-(?:1|2|3|4|5|6|8|10|12|16|24)\)$/;
 const LENGTH = /^\d{1,4}(?:px|%)$/;
 const COLUMNS = /^\d{1,2}(?:\.\d)?fr(?: \d{1,2}(?:\.\d)?fr)*$/;
 const ASPECT = /^\d{1,2} \/ \d{1,2}$/;
-const ID = /^[a-z][a-z0-9-]{0,40}$/;
+const ID = /^[a-z][a-z0-9-]{0,40}$/;          // an HTML id: must start with a letter
+/* A page slug becomes a FILENAME, so it may start with a digit — "404.html" is
+   the one Cloudflare Pages looks for by name. Still no dots and no slashes, so it
+   cannot climb out of the repo root or claim an extension of its own. */
+const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
 const tok = (re) => (value, fallback) => (typeof value === 'string' && re.test(value) ? value : fallback);
 const space = tok(SPACE);
@@ -252,6 +256,31 @@ const BLOCKS = {
     );
   },
 
+  /* A single image. `gallery` covers a grid; this covers the one-photo case an
+     officer reaches for far more often, and it keeps them out of a one-item
+     gallery whose column count then means nothing. */
+  image(b) {
+    const src = safeSrc(b.src);
+    if (!src) return '';
+    const max = length(b.maxWidth, '');
+    const ratio = aspect(b.aspect, '');
+    const img =
+      '<img src="' + attr(src) + '" alt="' + esc(b.alt) + '" loading="lazy"' +
+      styleAttr([
+        'width:100%',
+        'display:block',
+        'border-radius:var(--radius-lg)',
+        ratio ? 'aspect-ratio:' + ratio : '',
+        ratio ? 'object-fit:cover' : '',
+      ]) + '>';
+    return (
+      '<figure' + styleAttr(['margin:0', max ? 'max-width:' + max : '', max ? 'margin:0 auto' : '']) + '>' +
+      img +
+      (b.caption ? '<figcaption class="wcaa-gal__cap" style="margin-top:var(--space-2)">' + esc(b.caption) + '</figcaption>' : '') +
+      '</figure>'
+    );
+  },
+
   list(b) {
     const marker = iconTag(b.icon, 16);
     const items = (Array.isArray(b.items) ? b.items : [])
@@ -406,6 +435,12 @@ const BLOCKS = {
   },
 };
 
+/* The renderer IS the list of valid block types. Exported so js/validate-content.js
+   cannot keep a second copy that drifts — a validator with its own hardcoded list
+   eventually rejects a block the renderer handles, or accepts one it silently
+   drops, and both look like the CMS losing the officer's work. */
+export const BLOCK_TYPES = Object.keys(BLOCKS);
+
 /* An unknown block type renders NOTHING rather than throwing or passing the
    value through. pages.json is officer-editable, so an unrecognised type is
    either a typo or an injection attempt; both should be inert, and neither
@@ -536,7 +571,7 @@ export function renderPage(page, site) {
 export function renderSite(content, site) {
   const out = {};
   for (const page of content.pages || []) {
-    if (page && typeof page.slug === 'string' && ID.test(page.slug)) out[page.slug + '.html'] = renderPage(page, site);
+    if (page && typeof page.slug === 'string' && SLUG.test(page.slug)) out[page.slug + '.html'] = renderPage(page, site);
   }
   return out;
 }

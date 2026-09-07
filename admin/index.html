@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Site manager — WCAA NJ &amp; Southeastern PA Chapter</title>
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<section id="signin" hidden>
+  <form id="signin-form" class="signin-card">
+    <h1>Site manager</h1>
+    <p class="hint">Sign in to edit the chapter website.</p>
+    <label class="field">
+      <span class="field-label">Username</span>
+      <input class="input" id="username" name="username" type="text" autocomplete="username" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Password</span>
+      <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button class="btn btn--primary" type="submit">Sign in</button>
+    <p class="status status--bad" id="signin-error" role="alert"></p>
+  </form>
+</section>
+
+<div id="app" hidden>
+  <header class="bar">
+    <span class="bar-title">Site manager</span>
+    <span class="status" id="status" role="status">Everything is saved.</span>
+    <button class="btn btn--primary" id="save" type="button" disabled>Save changes</button>
+  </header>
+
+  <main class="cols">
+    <!-- Structure: pages, sections, blocks. The only place the shape is visible. -->
+    <section class="col col--outline" id="outline" aria-label="Site structure"></section>
+    <!-- The selected block's fields. -->
+    <section class="col col--editor" id="editor" aria-label="Block settings"></section>
+    <!-- Rendered by js/blocks.js — the same module the server uses at save time. -->
+    <section class="col col--preview">
+      <iframe id="preview" title="Preview of this page"></iframe>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

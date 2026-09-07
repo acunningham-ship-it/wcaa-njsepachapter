@@ -11,14 +11,28 @@
         "subtitle": "Window covering professionals across New Jersey and Southeastern Pennsylvania — education, collaboration, and connection.",
         "image": "uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_0.webp",
         "actions": [
-          { "label": "Join / Renew", "href": "join.html", "variant": "gold", "size": "lg" },
-          { "label": "Upcoming Events", "href": "events.html", "variant": "onDark", "size": "lg" }
+          {
+            "label": "Join / Renew",
+            "href": "join.html",
+            "variant": "gold",
+            "size": "lg"
+          },
+          {
+            "label": "Upcoming Events",
+            "href": "events.html",
+            "variant": "onDark",
+            "size": "lg"
+          }
         ]
       },
       "sections": [
         {
           "blocks": [
-            { "type": "heading", "kicker": "Welcome", "title": "A Community of Window Covering Professionals" },
+            {
+              "type": "heading",
+              "kicker": "Welcome",
+              "title": "A Community of Window Covering Professionals"
+            },
             {
               "type": "text",
               "align": "center",
@@ -98,7 +112,12 @@
                       "type": "buttons",
                       "layout": "plain",
                       "items": [
-                        { "label": "All Chapter Events", "href": "events.html", "variant": "outline", "size": "sm" }
+                        {
+                          "label": "All Chapter Events",
+                          "href": "events.html",
+                          "variant": "outline",
+                          "size": "sm"
+                        }
                       ]
                     }
                   ]
@@ -121,10 +140,22 @@
               "columns": 4,
               "aspect": "1 / 1",
               "items": [
-                { "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_0.webp", "alt": "Samuel & Sons showroom tour, NYC" },
-                { "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_1.webp", "alt": "Trim workshop at Stout Textiles" },
-                { "src": "uploads/wcaa-instagram-photos/30_DQsWOH8jhpS_1.webp", "alt": "Membership table at the Fall Table Top Show" },
-                { "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__0.webp", "alt": "Holiday cookie-decorating social" }
+                {
+                  "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_0.webp",
+                  "alt": "Samuel & Sons showroom tour, NYC"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_1.webp",
+                  "alt": "Trim workshop at Stout Textiles"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/30_DQsWOH8jhpS_1.webp",
+                  "alt": "Membership table at the Fall Table Top Show"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__0.webp",
+                  "alt": "Holiday cookie-decorating social"
+                }
               ]
             },
             {
@@ -159,19 +190,27 @@
               "type": "buttons",
               "layout": "center",
               "items": [
-                { "label": "Join / Renew Today", "href": "join.html", "variant": "gold", "size": "lg" }
+                {
+                  "label": "Join / Renew Today",
+                  "href": "join.html",
+                  "variant": "gold",
+                  "size": "lg"
+                }
               ]
             }
           ]
         }
       ]
     },
-
     {
       "slug": "about",
       "navHref": "about.html",
       "title": "About Us — WCAA NJ & Southeastern PA Chapter",
-      "hero": { "variant": "page", "kicker": "Our Chapter", "title": "About Us" },
+      "hero": {
+        "variant": "page",
+        "kicker": "Our Chapter",
+        "title": "About Us"
+      },
       "sections": [
         {
           "narrow": true,
@@ -198,7 +237,12 @@
               "type": "group",
               "marginBottom": "var(--space-16)",
               "blocks": [
-                { "type": "heading", "align": "left", "size": "sm", "title": "Mission Statement" },
+                {
+                  "type": "heading",
+                  "align": "left",
+                  "size": "sm",
+                  "title": "Mission Statement"
+                },
                 {
                   "type": "text",
                   "size": "md",
@@ -210,7 +254,12 @@
             {
               "type": "group",
               "blocks": [
-                { "type": "heading", "align": "left", "size": "sm", "title": "Our Goals" },
+                {
+                  "type": "heading",
+                  "align": "left",
+                  "size": "sm",
+                  "title": "Our Goals"
+                },
                 {
                   "type": "list",
                   "icon": "assets/icons/chevron-right.svg",
@@ -237,7 +286,11 @@
             {
               "type": "officers",
               "items": [
-                { "name": "Marie Weaverling", "role": "Chapter President", "phone": "(610) 331-5474" }
+                {
+                  "name": "Marie Weaverling",
+                  "role": "Chapter President",
+                  "phone": "(610) 331-5474"
+                }
               ]
             },
             {
@@ -245,21 +298,51 @@
               "layout": "inline",
               "marginTop": "var(--space-8)",
               "items": [
-                { "icon": "assets/icons/clock.svg", "lines": [[{ "text": "Monthly chapter meetings" }]] },
-                { "icon": "assets/icons/map-pin.svg", "lines": [[{ "text": "New Jersey & Southeastern Pennsylvania" }]] },
-                { "icon": "assets/icons/mail.svg", "lines": [[{ "text": "Announced by email & social" }]] }
+                {
+                  "icon": "assets/icons/clock.svg",
+                  "lines": [
+                    [
+                      {
+                        "text": "Monthly chapter meetings"
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "icon": "assets/icons/map-pin.svg",
+                  "lines": [
+                    [
+                      {
+                        "text": "New Jersey & Southeastern Pennsylvania"
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "icon": "assets/icons/mail.svg",
+                  "lines": [
+                    [
+                      {
+                        "text": "Announced by email & social"
+                      }
+                    ]
+                  ]
+                }
               ]
             }
           ]
         }
       ]
     },
-
     {
       "slug": "events",
       "navHref": "events.html",
       "title": "Chapter Events — WCAA NJ & Southeastern PA Chapter",
-      "hero": { "variant": "page", "kicker": "Calendar", "title": "Chapter Events" },
+      "hero": {
+        "variant": "page",
+        "kicker": "Calendar",
+        "title": "Chapter Events"
+      },
       "sections": [
         {
           "narrow": true,
@@ -333,19 +416,25 @@
                   "icon": "assets/icons/instagram.svg",
                   "iconSize": 16
                 },
-                { "label": "Ask About a Meeting", "href": "contact.html" }
+                {
+                  "label": "Ask About a Meeting",
+                  "href": "contact.html"
+                }
               ]
             }
           ]
         }
       ]
     },
-
     {
       "slug": "gallery",
       "navHref": "gallery.html",
       "title": "Gallery — WCAA NJ & Southeastern PA Chapter",
-      "hero": { "variant": "page", "kicker": "Chapter Life", "title": "Gallery" },
+      "hero": {
+        "variant": "page",
+        "kicker": "Chapter Life",
+        "title": "Gallery"
+      },
       "sections": [
         {
           "blocks": [
@@ -358,15 +447,42 @@
               "type": "gallery",
               "columns": 3,
               "items": [
-                { "src": "uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_1.webp", "alt": "Trivantage presentation — chapter meeting" },
-                { "src": "uploads/wcaa-instagram-photos/10_DXPGedUDjPO_0.webp", "alt": "Lafayette Interior Fashions at Phillips Workroom" },
-                { "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_3.webp", "alt": "Passementerie at Samuel & Sons" },
-                { "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_2.webp", "alt": "Trim sample boards" },
-                { "src": "uploads/wcaa-instagram-photos/14_DVzrjrFDn_S_1.webp", "alt": "DEL Motorized Solutions event" },
-                { "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_1.webp", "alt": "Samuel & Sons, New York City" },
-                { "src": "uploads/wcaa-instagram-photos/30_DQsWOH8jhpS_0.webp", "alt": "Members at the Fall Table Top Show" },
-                { "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_3.webp", "alt": "Fabric warehouse tour" },
-                { "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__1.webp", "alt": "Holiday cookie-decorating workshop" }
+                {
+                  "src": "uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_1.webp",
+                  "alt": "Trivantage presentation — chapter meeting"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/10_DXPGedUDjPO_0.webp",
+                  "alt": "Lafayette Interior Fashions at Phillips Workroom"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_3.webp",
+                  "alt": "Passementerie at Samuel & Sons"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_2.webp",
+                  "alt": "Trim sample boards"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/14_DVzrjrFDn_S_1.webp",
+                  "alt": "DEL Motorized Solutions event"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_1.webp",
+                  "alt": "Samuel & Sons, New York City"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/30_DQsWOH8jhpS_0.webp",
+                  "alt": "Members at the Fall Table Top Show"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_3.webp",
+                  "alt": "Fabric warehouse tour"
+                },
+                {
+                  "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__1.webp",
+                  "alt": "Holiday cookie-decorating workshop"
+                }
               ]
             },
             {
@@ -387,12 +503,15 @@
         }
       ]
     },
-
     {
       "slug": "contact",
       "navHref": "contact.html",
       "title": "Contact Us — WCAA NJ & Southeastern PA Chapter",
-      "hero": { "variant": "page", "kicker": "Say Hello", "title": "Contact Us" },
+      "hero": {
+        "variant": "page",
+        "kicker": "Say Hello",
+        "title": "Contact Us"
+      },
       "sections": [
         {
           "blocks": [
@@ -426,19 +545,43 @@
                     {
                       "icon": "assets/icons/phone.svg",
                       "lines": [
-                        [{ "text": "Marie Weaverling", "strong": true }, { "text": ", Chapter President" }],
-                        [{ "text": "(610) 331-5474" }]
+                        [
+                          {
+                            "text": "Marie Weaverling",
+                            "strong": true
+                          },
+                          {
+                            "text": ", Chapter President"
+                          }
+                        ],
+                        [
+                          {
+                            "text": "(610) 331-5474"
+                          }
+                        ]
                       ]
                     },
                     {
                       "icon": "assets/icons/instagram.svg",
                       "lines": [
-                        [{ "text": "@wcaasepanjchapter", "href": "https://www.instagram.com/wcaasepanjchapter/", "external": true }]
+                        [
+                          {
+                            "text": "@wcaasepanjchapter",
+                            "href": "https://www.instagram.com/wcaasepanjchapter/",
+                            "external": true
+                          }
+                        ]
                       ]
                     },
                     {
                       "icon": "assets/icons/map-pin.svg",
-                      "lines": [[{ "text": "Serving New Jersey & Southeastern Pennsylvania" }]]
+                      "lines": [
+                        [
+                          {
+                            "text": "Serving New Jersey & Southeastern Pennsylvania"
+                          }
+                        ]
+                      ]
                     }
                   ]
                 },
@@ -461,12 +604,15 @@
         }
       ]
     },
-
     {
       "slug": "join",
       "navHref": "join.html",
       "title": "Join / Renew — WCAA NJ & Southeastern PA Chapter",
-      "hero": { "variant": "page", "kicker": "Membership", "title": "Join / Renew" },
+      "hero": {
+        "variant": "page",
+        "kicker": "Membership",
+        "title": "Join / Renew"
+      },
       "sections": [
         {
           "narrow": true,
@@ -484,9 +630,17 @@
               "muted": true,
               "flush": true,
               "spans": [
-                { "text": "Chapter membership requires an " },
-                { "text": "active WCAA National membership", "strong": true, "heading": true },
-                { "text": ". New to WCAA? Start with Step 1." }
+                {
+                  "text": "Chapter membership requires an "
+                },
+                {
+                  "text": "active WCAA National membership",
+                  "strong": true,
+                  "heading": true
+                },
+                {
+                  "text": ". New to WCAA? Start with Step 1."
+                }
               ]
             }
           ]
@@ -517,7 +671,11 @@
                   "n": "2",
                   "title": "Pay Chapter Dues",
                   "text": "Once your National membership is active, select and pay your NJ/SEPA Chapter dues using the buttons below.",
-                  "action": { "label": "See Dues Below", "href": "#join-dues", "variant": "outline" }
+                  "action": {
+                    "label": "See Dues Below",
+                    "href": "#join-dues",
+                    "variant": "outline"
+                  }
                 }
               ]
             }
@@ -538,9 +696,21 @@
               "gap": "var(--space-4)",
               "maxWidth": "520px",
               "items": [
-                { "label": "Individual Membership Dues", "size": "lg", "fullWidth": true },
-                { "label": "Corporate Membership Dues (Includes 2 Members)", "size": "lg", "fullWidth": true },
-                { "label": "Add-on Employee (Corporate Members Only)", "variant": "outline", "fullWidth": true }
+                {
+                  "label": "Individual Membership Dues",
+                  "size": "lg",
+                  "fullWidth": true
+                },
+                {
+                  "label": "Corporate Membership Dues (Includes 2 Members)",
+                  "size": "lg",
+                  "fullWidth": true
+                },
+                {
+                  "label": "Add-on Employee (Corporate Members Only)",
+                  "variant": "outline",
+                  "fullWidth": true
+                }
               ]
             }
           ]
@@ -559,7 +729,75 @@
               "type": "buttons",
               "layout": "center",
               "items": [
-                { "label": "Contact Us About Membership", "href": "contact.html", "variant": "gold", "size": "lg" }
+                {
+                  "label": "Contact Us About Membership",
+                  "href": "contact.html",
+                  "variant": "gold",
+                  "size": "lg"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "404",
+      "navHref": "",
+      "title": "Page not found — WCAA NJ & Southeastern PA Chapter",
+      "hero": {
+        "variant": "page",
+        "kicker": "Sorry about that",
+        "title": "We couldn’t find that page"
+      },
+      "sections": [
+        {
+          "narrow": true,
+          "blocks": [
+            {
+              "type": "text",
+              "align": "center",
+              "size": "md",
+              "marginBottom": "var(--space-8)",
+              "text": "The page you were looking for has moved or no longer exists. The links below cover everything on the chapter site."
+            },
+            {
+              "type": "buttons",
+              "layout": "row",
+              "gap": "var(--space-4)",
+              "items": [
+                {
+                  "label": "Home",
+                  "href": "index.html",
+                  "variant": "outline"
+                },
+                {
+                  "label": "About Us",
+                  "href": "about.html",
+                  "variant": "outline"
+                },
+                {
+                  "label": "Events",
+                  "href": "events.html",
+                  "variant": "outline"
+                },
+                {
+                  "label": "Gallery",
+                  "href": "gallery.html",
+                  "variant": "outline"
+                }
+              ]
+            },
+            {
+              "type": "buttons",
+              "layout": "center",
+              "marginTop": "var(--space-6)",
+              "items": [
+                {
+                  "label": "Contact the Chapter",
+                  "href": "contact.html",
+                  "variant": "gold"
+                }
               ]
             }
           ]

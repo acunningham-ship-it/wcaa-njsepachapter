@@ -151,3 +151,75 @@ export async function ghPutFile(env, path, base64Content, message, sha) {
   const body = await res.json();
   return { ok: true, commit: body.commit && body.commit.sha };
 }
+
+export async function ghGetFile(env, path) {
+  const res = await fetch(`${contentsUrl(env, path)}?ref=${encodeURIComponent(branchOf(env))}`, { headers: ghHeaders(env) });
+  if (res.status === 404) return { ok: true, content: null };
+  if (!res.ok) return { ok: false, status: res.status, error: await res.text() };
+  const body = await res.json();
+  if (!body || typeof body.content !== 'string') return { ok: true, content: null };
+  return { ok: true, content: dec.decode(base64ToBytes(body.content.replace(/\s/g, ''))), sha: body.sha };
+}
+
+/* ---------- Git Data API: many files, ONE commit ----------
+   ⛔ USE THIS, NOT ghPutFile IN A LOOP, whenever a save touches more than one
+   file. Saving the site writes content/pages.json AND regenerates every .html
+   from it. With the Contents API that is N+1 separate commits: each one triggers
+   its own Cloudflare Pages build, and a failure partway through leaves the
+   committed content and the committed HTML disagreeing with each other — on a
+   live site, with no obvious symptom beyond "the page didn't change".
+
+   Blob -> tree -> commit -> ref is four extra requests and gets one atomic
+   commit and one deploy. `files` is [{ path, content }]; a null content DELETES
+   that path, which is how a page removed in the editor stops being served. */
+export async function ghCommitFiles(env, files, message) {
+  const repo = repoOf(env);
+  const branch = branchOf(env);
+  const api = async (path, init) => {
+    const res = await fetch(`${GH_API}/repos/${repo}${path}`, Object.assign({ headers: ghHeaders(env) }, init));
+    if (!res.ok) return { ok: false, status: res.status, error: (await res.text()).slice(0, 500) };
+    return { ok: true, body: await res.json() };
+  };
+  const post = (path, payload) => api(path, {
+    method: 'POST',
+    headers: Object.assign(ghHeaders(env), { 'content-type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+
+  const ref = await api(`/git/ref/heads/${encodeURIComponent(branch)}`);
+  if (!ref.ok) return ref;
+  const headSha = ref.body.object.sha;
+
+  const headCommit = await api(`/git/commits/${headSha}`);
+  if (!headCommit.ok) return headCommit;
+  const baseTree = headCommit.body.tree.sha;
+
+  const tree = [];
+  for (const file of files) {
+    if (file.content === null) {
+      tree.push({ path: file.path, mode: '100644', type: 'blob', sha: null });
+      continue;
+    }
+    const blob = await post('/git/blobs', { content: utf8ToBase64(file.content), encoding: 'base64' });
+    if (!blob.ok) return blob;
+    tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blob.body.sha });
+  }
+
+  const newTree = await post('/git/trees', { base_tree: baseTree, tree });
+  if (!newTree.ok) return newTree;
+
+  const commit = await post('/git/commits', { message, tree: newTree.body.sha, parents: [headSha] });
+  if (!commit.ok) return commit;
+
+  /* No force. If someone else committed since we read the ref, this fails and the
+     caller retries against the new head — rather than silently discarding whatever
+     landed in between, which on this repo could be another officer's edit. */
+  const update = await api(`/git/refs/heads/${encodeURIComponent(branch)}`, {
+    method: 'PATCH',
+    headers: Object.assign(ghHeaders(env), { 'content-type': 'application/json' }),
+    body: JSON.stringify({ sha: commit.body.sha, force: false }),
+  });
+  if (!update.ok) return update;
+
+  return { ok: true, commit: commit.body.sha, files: files.length };
+}

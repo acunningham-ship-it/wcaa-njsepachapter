@@ -41,7 +41,11 @@ const content = JSON.parse(read('content/pages.json'));
   const a = renderSite(content, site);
   const b = renderSite(JSON.parse(read('content/pages.json')), JSON.parse(read('content/site.json')));
   const names = Object.keys(a);
-  ok('renders all six pages', names.length === 6, names);
+  /* Derived from the content, not hardcoded — a count written as a literal has to
+     be edited every time an officer adds a page, and the edit that "fixes the
+     test" is exactly the edit that stops it noticing a page went missing. */
+  ok(`renders every page in pages.json (${content.pages.length})`,
+     names.length === content.pages.length, names);
   ok('two renders of the same content are byte-identical',
      names.every((n) => a[n] === b[n]),
      names.filter((n) => a[n] !== b[n]));
@@ -193,11 +197,25 @@ const content = JSON.parse(read('content/pages.json'));
   has('contact.html', 'name="message"');
   has('join.html', 'active WCAA National membership');
   has('join.html', 'Corporate Membership Dues (Includes 2 Members)');
+  has('404.html', 'We couldn’t find that page');
+  has('404.html', 'Contact the Chapter');
+  /* Match the class EXACTLY. A bare /wcaa-nav__link/ also matches the container's
+     `wcaa-nav__links`, which counts one link too many — the same substring-vs-
+     structure mistake this suite catches elsewhere, made here in the test itself. */
+  ok('404.html still carries the full nav, so a lost visitor can get out',
+     (p['404.html'].match(/class="wcaa-nav__link"/g) || []).length === site.nav.length,
+     { found: (p['404.html'].match(/class="wcaa-nav__link"/g) || []).length, expected: site.nav.length });
 
+  const navHrefs = site.nav.map((l) => l.href);
   for (const [name, html] of Object.entries(p)) {
     ok(`${name} ships no JavaScript`, !/<script/i.test(html) && !/ on[a-z]+=/i.test(html));
-    ok(`${name} marks its own nav link active`,
-       (html.match(/wcaa-nav__link--active/g) || []).length === (name === 'join.html' ? 0 : 1));
+    /* A page highlights its own nav link, and only pages that ARE in the nav can.
+       join.html and 404.html are reachable but not nav entries, so zero is right
+       for them — derived from site.json rather than a list of exceptions. */
+    const page = content.pages.find((pg) => pg.slug + '.html' === name);
+    const expected = navHrefs.includes(page.navHref) ? 1 : 0;
+    ok(`${name} marks its own nav link active (${expected})`,
+       (html.match(/wcaa-nav__link--active/g) || []).length === expected);
   }
   ok('every gallery image has an alt attribute',
      (p['gallery.html'].match(/<img /g) || []).length === (p['gallery.html'].match(/<img [^>]*alt="/g) || []).length);

@@ -686,7 +686,7 @@
             {
               "type": "heading",
               "title": "Pay Annual Dues Here",
-              "lede": "Please use these buttons to join or renew your membership."
+              "lede": "Select your membership type below and we'll send you payment details."
             },
             {
               "type": "buttons",
@@ -698,17 +698,20 @@
                 {
                   "label": "Individual Membership Dues",
                   "size": "lg",
-                  "fullWidth": true
+                  "fullWidth": true,
+                  "href": "contact.html"
                 },
                 {
                   "label": "Corporate Membership Dues (Includes 2 Members)",
                   "size": "lg",
-                  "fullWidth": true
+                  "fullWidth": true,
+                  "href": "contact.html"
                 },
                 {
                   "label": "Add-on Employee (Corporate Members Only)",
                   "variant": "outline",
-                  "fullWidth": true
+                  "fullWidth": true,
+                  "href": "contact.html"
                 }
               ]
             }

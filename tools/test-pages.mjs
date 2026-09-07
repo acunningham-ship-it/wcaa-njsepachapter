@@ -330,11 +330,10 @@ const content = JSON.parse(read('content/pages.json'));
      chapter holds, and wiring a payment button spends someone's money — raised
      with judge #8724, waiting on Armani. When the URLs land these entries go
      away and the list should end up empty. */
-  const KNOWN_DEAD = [
-    'Individual Membership Dues',
-    'Corporate Membership Dues (Includes 2 Members)',
-    'Add-on Employee (Corporate Members Only)',
-  ];
+  /* Empty, and that is the point: the three membership-dues buttons that used to
+     live here now link to contact.html, so the list has done its job. Kept rather
+     than deleted so the next inert control lands in a slot that already exists. */
+  const KNOWN_DEAD = [];
 
   /* Read the href by attribute NAME. A substring test for `href` also matches
      the `href` inside an onclick or a data- value, which is the exact
@@ -389,8 +388,14 @@ const content = JSON.parse(read('content/pages.json'));
   ok('control: a submit with no endpoint IS flagged',
      inertIn('<form><button type="submit">Send</button></form>').length === 1);
 
-  ok('the known-dead list still matches what is actually on the page',
-     KNOWN_DEAD.every((label) => pages['join.html'].includes(label)), KNOWN_DEAD);
+  /* The dues controls must still be REACHABLE, not merely non-inert -- deleting
+     them would also satisfy the assertion above. */
+  ok('the three dues controls are present and each points at a real page',
+     ['Individual Membership Dues', 'Corporate Membership Dues (Includes 2 Members)',
+      'Add-on Employee (Corporate Members Only)'].every((label) => {
+       const m = pages['join.html'].match(new RegExp('<a ([^>]*)>' + label.replace(/[()]/g, '\\$&') + '</a>'));
+       return m && /href="contact\.html"/.test(m[1]);
+     }), pages['join.html'].match(/<a [^>]*wcaa-btn--full[^>]*>/g));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

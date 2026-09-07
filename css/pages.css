@@ -63,3 +63,24 @@
 /* The Turnstile widget reserves its own height; give it room without letting it
    push the submit button off a narrow screen. */
 .cf-turnstile { min-height: 65px; }
+
+/* A .wcaa-btn renders as <a> when it has a destination and <button> when it does
+   not — the design system's own Button does the same. But .wcaa-btn sets no
+   box-sizing and no line-height, and the two elements disagree on both defaults:
+   a <button> gets border-box and line-height:normal from the UA stylesheet, an
+   <a> gets content-box and the inherited body line-height. So .wcaa-btn--full
+   (width:100%) renders ~67px WIDER as a link than as a button, and ~2px taller.
+
+   The design system knew about this trap — .wcaa-field__input is the one other
+   width:100% element and it carries box-sizing:border-box. .wcaa-btn was just
+   missed, and the prototype never surfaced it because a mock's buttons had no
+   destinations, so they were always <button>. */
+.wcaa-btn { box-sizing: border-box; }
+
+/* ponytail: box-sizing only, deliberately NOT line-height. line-height would make
+   <a> and <button> pixel-identical, but it moves EVERY page carrying an
+   <a class="wcaa-btn"> by ~3px, and five of those are gated at 0 pixels against
+   the prototype. box-sizing only affects elements with an explicit width, i.e.
+   .wcaa-btn--full, which exists on join.html alone. The residue is that the three
+   dues links stand 2px taller than a <button> would. Add line-height if the button
+   family is ever unified deliberately -- not as a side effect of this fix. */

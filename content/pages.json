@@ -6,7 +6,8 @@
       "title": "WCAA New Jersey & Southeastern Pennsylvania Chapter",
       "hero": {
         "variant": "full",
-        "kicker": "Window Coverings Association of America",
+        "logo": "assets/wcaa-logo.png",
+        "logoAlt": "Window Coverings Association of America",
         "title": "New Jersey & Southeastern Pennsylvania Chapter",
         "subtitle": "Window covering professionals across New Jersey and Southeastern Pennsylvania — education, collaboration, and connection.",
         "image": "uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_0.webp",

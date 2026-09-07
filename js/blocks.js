@@ -549,7 +549,9 @@ function renderHero(h) {
     (media ? '<div class="wcaa-hero__media"><img src="' + attr(media) + '" alt=""></div>' : '') +
     '<div class="wcaa-hero__ovl"></div>' +
     '<div class="wcaa-hero__in">' +
-    (h.kicker ? '<div class="wcaa-hero__kicker">' + esc(h.kicker) + '</div>' : '') +
+    (h.logo
+      ? '<img class="wcaa-hero__logo" src="' + attr(h.logo) + '" alt="' + attr(h.logoAlt || '') + '" width="132" height="132">'
+      : (h.kicker ? '<div class="wcaa-hero__kicker">' + esc(h.kicker) + '</div>' : '')) +
     '<h1 class="wcaa-hero__title">' + esc(h.title) + '</h1>' +
     '<div class="wcaa-hero__rule"></div>' +
     (h.subtitle ? '<p class="wcaa-hero__sub">' + esc(h.subtitle) + '</p>' : '') +
@@ -572,7 +574,9 @@ function renderNav(site, activeHref) {
   return (
     '<nav class="wcaa-nav"><div class="wcaa-nav__in">' +
     '<a class="wcaa-nav__brand" href="' + attr(safeHref(site.homeHref) || 'index.html') + '">' +
-    '<span class="wcaa-nav__mark">' + esc(site.brandMark) + '</span>' +
+    (site.brandLogo
+      ? '<img class="wcaa-nav__logo" src="' + attr(site.brandLogo) + '" alt="' + attr(site.brandLogoAlt || site.brandMark) + '" width="48" height="48">'
+      : '<span class="wcaa-nav__mark">' + esc(site.brandMark) + '</span>') +
     '<span class="wcaa-nav__div"></span>' +
     '<span class="wcaa-nav__sub">' + esc(site.brandSub) + '</span></a>' +
     '<div class="wcaa-nav__links">' + (site.nav || []).map(link).join('') +

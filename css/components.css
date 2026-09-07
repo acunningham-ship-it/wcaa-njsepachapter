@@ -19,6 +19,7 @@
 .wcaa-hero__ovl{position:absolute;inset:0;background:var(--overlay-hero);pointer-events:none}
 .wcaa-hero__in{position:relative;max-width:820px;padding:var(--space-16) var(--space-6);display:flex;flex-direction:column;align-items:center;gap:var(--space-5)}
 .wcaa-hero__kicker{font:600 13px/1 var(--font-body);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--gold-300)}
+.wcaa-hero__logo{width:132px;height:auto;display:block;filter:drop-shadow(0 2px 10px rgba(0,0,0,.28))}
 .wcaa-hero__title{font-family:var(--font-display);font-weight:400;color:#fff;font-size:var(--text-4xl);line-height:var(--leading-tight);margin:0;text-wrap:balance}
 .wcaa-hero--page .wcaa-hero__title{font-size:var(--text-3xl)}
 .wcaa-hero__rule{width:var(--rule-w);height:var(--rule-h);background:var(--gold-400)}
@@ -123,6 +124,7 @@
 .wcaa-nav__brand{display:flex;align-items:center;gap:14px;text-decoration:none;flex:none}
 .wcaa-nav__brand:hover{text-decoration:none}
 .wcaa-nav__mark{font-family:var(--font-display);font-size:30px;letter-spacing:.05em;color:var(--blue-900);line-height:1}
+.wcaa-nav__logo{height:48px;width:auto;display:block;flex:none}
 .wcaa-nav__div{width:1px;height:34px;background:var(--gold-400)}
 .wcaa-nav__sub{font:600 10.5px/1.35 var(--font-body);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-muted);max-width:210px}
 .wcaa-nav__links{display:flex;align-items:center;gap:var(--space-6);margin-left:auto}

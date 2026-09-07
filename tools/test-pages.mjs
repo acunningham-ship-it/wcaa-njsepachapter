@@ -300,5 +300,84 @@ const content = JSON.parse(read('content/pages.json'));
      renderBlocks([{ type: 'rsvpForm', eventId: 'jun-18' }], site).includes('name="event_id" value="jun-18"'));
 }
 
+/* ---------- 6. no interactive element that does nothing when clicked ---------- */
+{
+  /* Why this exists: join.html shipped three membership-payment buttons with no
+     href, no form and no handler, on a page whose own copy tells the visitor
+     twice to "use these buttons to join or renew". Nothing caught it, because
+     the page was a FAITHFUL render of the prototype — the prototype's Button had
+     no destination either. Pixel fidelity cannot catch a dead button: it looks
+     exactly like a live one. Only behaviour can.
+     Fail-closed on the WHOLE site, not just the page the defect was found on. */
+
+  /* The three known-dead buttons, kept as an explicit list rather than an
+     exemption for join.html, so this is a record of an open question and not a
+     hole. Where chapter dues are actually paid (and how much) is a fact only the
+     chapter holds, and wiring a payment button spends someone's money — raised
+     with judge #8724, waiting on Armani. When the URLs land these entries go
+     away and the list should end up empty. */
+  const KNOWN_DEAD = [
+    'Individual Membership Dues',
+    'Corporate Membership Dues (Includes 2 Members)',
+    'Add-on Employee (Corporate Members Only)',
+  ];
+
+  /* Read the href by attribute NAME. A substring test for `href` also matches
+     the `href` inside an onclick or a data- value, which is the exact
+     substring-vs-structure mistake this suite exists to catch. */
+  const attrOf = (tag, name) => {
+    for (const m of tag.matchAll(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*"([^"]*)"/g)) {
+      if (m[1].toLowerCase() === name) return m[2];
+    }
+    return null;
+  };
+  const strip = (s) => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+  const inertIn = (html) => {
+    const dead = [];
+    /* A button is live only if it submits a form the site can actually send.
+       forms.js handles form[data-endpoint]; anything else is decoration. */
+    const wired = html.includes('data-endpoint=') && html.includes('js/forms.js');
+    for (const m of html.matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)) {
+      const type = attrOf('<button' + m[1] + '>', 'type') || 'submit';
+      if (!(type === 'submit' && wired)) dead.push(strip(m[2]));
+    }
+    for (const m of html.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)) {
+      const href = attrOf('<a ' + m[1] + '>', 'href');
+      if (href === null || href.trim() === '' || href.trim() === '#') dead.push(strip(m[2]));
+    }
+    return dead;
+  };
+
+  const pages = renderSite(content, site);
+  const unexpected = [];
+  for (const [file, html] of Object.entries(pages)) {
+    for (const label of inertIn(html)) {
+      if (!KNOWN_DEAD.includes(label)) unexpected.push(`${file}: ${label}`);
+    }
+  }
+  ok('no NEW element on any page looks clickable and does nothing',
+     unexpected.length === 0, unexpected);
+
+  /* ⛔ The assertion above is absence-only, and an absence-only check passes
+     hardest when the instrument is broken — a detector that finds nothing at all
+     reports a clean site. So prove it still FIRES. */
+  ok('control: the detector catches a button with no destination',
+     inertIn('<button type="button">Pay Now</button>').length === 1);
+  ok('control: the detector catches an empty href',
+     inertIn('<a href="#">Join</a>').length === 1);
+  ok('control: a real link is NOT flagged',
+     inertIn('<a href="join.html">Join</a>').length === 0);
+  ok('control: a submit inside a wired form is NOT flagged',
+     inertIn('<script src="js/forms.js"></script><form data-endpoint="/api/contact">' +
+             '<button type="submit">Send</button></form>').length === 0);
+  /* ...and the same submit is flagged when nothing can send it. */
+  ok('control: a submit with no endpoint IS flagged',
+     inertIn('<form><button type="submit">Send</button></form>').length === 1);
+
+  ok('the known-dead list still matches what is actually on the page',
+     KNOWN_DEAD.every((label) => pages['join.html'].includes(label)), KNOWN_DEAD);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

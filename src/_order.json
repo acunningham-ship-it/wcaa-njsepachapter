@@ -1,0 +1,23 @@
+[
+  "components/content/GalleryGrid.jsx",
+  "components/content/Hero.jsx",
+  "components/content/OfficerCard.jsx",
+  "components/core/Badge.jsx",
+  "components/content/EventCard.jsx",
+  "components/core/Button.jsx",
+  "components/core/Icon.jsx",
+  "components/core/SectionHeading.jsx",
+  "components/forms/Input.jsx",
+  "components/forms/TextArea.jsx",
+  "components/navigation/Footer.jsx",
+  "components/navigation/NavBar.jsx",
+  "ui_kits/website/Section.jsx",
+  "ui_kits/website/AboutPage.jsx",
+  "ui_kits/website/ContactPage.jsx",
+  "ui_kits/website/EventsPage.jsx",
+  "ui_kits/website/GalleryPage.jsx",
+  "ui_kits/website/HomePage.jsx",
+  "ui_kits/website/JoinPage.jsx",
+  "ui_kits/website/WebsiteApp.jsx",
+  "ui_kits/website/image-slot.js"
+]

@@ -1,0 +1,24 @@
+<!-- @dsCard group="Website" viewport="1280x820" name="Chapter Website" subtitle="Interactive click-through — Home · About · Events · Gallery · Join/Renew · Contact" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>WCAA Southeastern PA &amp; NJ Chapter</title>
+<link rel="stylesheet" href="styles.css">
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="_ds_bundle.js"></script>
+<script src="image-slot.js"></script>
+</head>
+<body><div id="root"></div>
+<script>
+function mount(tries) {
+  const NS = window.WCAASEPANJDesignSystem_207f6d;
+  if (NS && NS.WebsiteApp) {
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(NS.WebsiteApp));
+  } else if (tries > 0) {
+    setTimeout(() => mount(tries - 1), 300);
+  } else {
+    document.getElementById("root").innerHTML = '<p style="font:15px/1.5 sans-serif;padding:40px;color:#3f4a56">Design-system bundle not loaded yet — refresh this page.</p>';
+  }
+}
+mount(20);
+</script>
+</body></html>

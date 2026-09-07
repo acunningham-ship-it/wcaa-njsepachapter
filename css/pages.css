@@ -1,0 +1,44 @@
+/* Static-site overrides. Everything else comes from css/components.css, which is
+   the design system's own CSS extracted verbatim — this file is the short list of
+   places where "a React prototype with JavaScript" and "a static site without it"
+   genuinely differ. Keep it short; if it grows, the divergence is the problem.
+
+   Loaded after components.css, so these win on equal specificity. */
+
+/* The prototype collapsed the nav into a burger below 920px and opened the sheet
+   with React state. These pages ship no JavaScript, so a burger would be a button
+   that does nothing. The links stay visible and wrap onto their own row instead —
+   fewer moving parts, and it works with scripting off, which is the whole point of
+   a static site. Scoped to the breakpoint, so wider viewports are untouched. */
+@media (max-width: 920px) {
+  .wcaa-nav__in {
+    height: auto;
+    flex-wrap: wrap;
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+    gap: var(--space-3);
+  }
+  .wcaa-nav__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* Single-column below the phone breakpoint. The prototype only ever ran at
+   desktop widths in the design tool, so its grids had no mobile case at all and
+   a 3-up card row squeezed to ~100px columns on a phone.
+
+   The column counts live in a style attribute because they vary per block, so
+   overriding them needs !important — that is exactly the case !important exists
+   for, and it is scoped to one breakpoint. */
+@media (max-width: 720px) {
+  .wcaa-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .wcaa-gal {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

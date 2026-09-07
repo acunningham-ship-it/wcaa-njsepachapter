@@ -5,16 +5,55 @@ Deploys from the **`master`** branch, root directory, via GitHub Pages.
 
 ## How to change the site
 
-Edit the files under **`src/`**, then:
+The pages are **generated** from `content/`. Edit the content, rebuild, commit both:
+
+```bash
+node tools/build-pages.mjs          # regenerates the .html files from content/
+node tools/build-pages.mjs --check  # verifies the .html files match content/, writes nothing
+node tools/test-pages.mjs           # determinism + dual-runtime + escaping
+git add -A && git commit && git push origin master
+```
+
+`content/site.json` holds the chrome every page shares — brand line, nav, footer,
+copyright. `content/pages.json` holds the pages themselves: each one is a hero plus a
+list of sections, and each section is a list of blocks.
+
+**Do not hand-edit `index.html`, `about.html`, `events.html`, `gallery.html`,
+`contact.html` or `join.html`.** They are build output; the next save overwrites them.
+`--check` exists to catch exactly that mistake before it reaches a commit.
+
+### The blocks
+
+| type | what it is |
+|---|---|
+| `heading` | kicker + title + rule + lede |
+| `text` | a paragraph; `spans` for a bold run or an inline link |
+| `buttons` | a row, a centred one, or a full-width stack |
+| `cards` | a grid of cards, marked with an `icon` or a `number` |
+| `events` | dated event cards |
+| `gallery` | a photo grid |
+| `list` | an icon-bulleted list |
+| `officers` | officer photo/initials, role, phone |
+| `iconRows` | icon + text rows, `stack` or `inline` |
+| `contactForm` | the contact form (fixed fields; heading and footnote are editable) |
+| `group` | wraps a run of blocks, optionally spacing them with `gap` |
+| `split` | a two-column row; each column holds its own blocks |
+
+An **unrecognised block type renders nothing at all**. That is deliberate — this file
+is edited through a CMS, so an unknown type is either a typo or an injection attempt,
+and both should be inert. The trade-off is that a typo makes a section vanish silently,
+which is why `tools/test-pages.mjs` asserts a landmark string from every page.
+
+### The old React prototype
+
+`src/` + `_ds_bundle.js` are the original claude-design prototype that these pages were
+ported from. It is kept as the visual reference the port was verified against, and it
+still builds:
 
 ```bash
 python3 build.py          # regenerates _ds_bundle.js from src/
 python3 build.py --check  # verifies the bundle matches src/ without writing
-git add -A && git commit && git push origin master
 ```
-
-Commit **both** `src/` and the regenerated `_ds_bundle.js` — the browser loads the
-bundle, not `src/`.
 
 ## Layout
 
@@ -56,6 +95,28 @@ the question is ever really about.
 (An earlier draft of this README quoted the exact character count. It went stale within
 one commit, because the count changes every time anything is edited. A number a human has
 to remember to update is not documentation of a live property — the command is.)
+
+## How the port was verified
+
+Every page was screenshotted from the React prototype and from the generated static
+page at 1280×DPR1 and compared pixel by pixel. **Five of the six pages match at zero
+pixels; `about.html` differs by 642 px, and that difference is intended** — see below.
+
+Photographs are compared separately, with every image hidden but its box preserved,
+because they cannot match byte-for-byte and the reason is not a defect: the prototype
+positions a photo with a fractional CSS `transform` and the static page uses
+`object-fit: cover`, so the same file in the same box lands half a pixel apart and
+resamples differently. Measured, not assumed — the alignment search over ±2 px in both
+axes puts the minimum at (0, 0), so there is no offset, only resampling.
+
+Two differences are deliberate:
+
+1. **The officer avatar.** The prototype drew an empty editor drop-slot; a live site has
+   no editor, so the static page falls back to the officer's initials. 642 px on
+   `about.html`, all of them inside that circle.
+2. **The mobile nav.** The prototype collapsed the links into a burger and opened them
+   with React state. These pages ship no JavaScript, so below 920 px the links wrap onto
+   their own row instead of hiding behind a button that could never open.
 
 ## Two things that will silently break the site
 

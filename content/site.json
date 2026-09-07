@@ -1,0 +1,30 @@
+{
+  "brandMark": "WCAA",
+  "brandSub": "New Jersey & Southeastern Pennsylvania Chapter",
+  "title": "WCAA Southeastern PA & NJ Chapter",
+  "homeHref": "index.html",
+  "nav": [
+    { "label": "Home", "href": "index.html" },
+    { "label": "About Us", "href": "about.html" },
+    { "label": "Events", "href": "events.html" },
+    { "label": "Gallery", "href": "gallery.html" },
+    { "label": "Contact Us", "href": "contact.html" }
+  ],
+  "navCta": { "label": "Join / Renew", "href": "join.html" },
+  "footerLinks": [
+    { "label": "Home", "href": "index.html" },
+    { "label": "About Us", "href": "about.html" },
+    { "label": "Events", "href": "events.html" },
+    { "label": "Gallery", "href": "gallery.html" },
+    { "label": "Contact Us", "href": "contact.html" },
+    { "label": "Join/Renew", "href": "join.html" }
+  ],
+  "socials": [
+    {
+      "label": "Instagram",
+      "href": "https://www.instagram.com/wcaasepanjchapter/",
+      "icon": "assets/icons/instagram.svg"
+    }
+  ],
+  "copyright": "Copyright © 2026 Window Coverings Association of America — New Jersey and Southeastern Pennsylvania Chapter — All Rights Reserved."
+}

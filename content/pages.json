@@ -1,0 +1,570 @@
+{
+  "pages": [
+    {
+      "slug": "index",
+      "navHref": "index.html",
+      "title": "WCAA New Jersey & Southeastern Pennsylvania Chapter",
+      "hero": {
+        "variant": "full",
+        "kicker": "Window Coverings Association of America",
+        "title": "New Jersey & Southeastern Pennsylvania Chapter",
+        "subtitle": "Window covering professionals across New Jersey and Southeastern Pennsylvania — education, collaboration, and connection.",
+        "image": "uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_0.webp",
+        "actions": [
+          { "label": "Join / Renew", "href": "join.html", "variant": "gold", "size": "lg" },
+          { "label": "Upcoming Events", "href": "events.html", "variant": "onDark", "size": "lg" }
+        ]
+      },
+      "sections": [
+        {
+          "blocks": [
+            { "type": "heading", "kicker": "Welcome", "title": "A Community of Window Covering Professionals" },
+            {
+              "type": "text",
+              "align": "center",
+              "size": "md",
+              "prose": true,
+              "text": "We are proud members of the Window Coverings Association of America — the only national non-profit trade association dedicated to the retail window coverings industry and to the dealers, designers, decorators, workrooms, fabricators, and installers who are our members."
+            }
+          ]
+        },
+        {
+          "tint": true,
+          "tight": true,
+          "blocks": [
+            {
+              "type": "cards",
+              "columns": 3,
+              "marker": "icon",
+              "items": [
+                {
+                  "icon": "assets/icons/calendar-days.svg",
+                  "title": "Monthly Programs",
+                  "text": "Speakers, software demos, and workroom education at our monthly chapter meetings."
+                },
+                {
+                  "icon": "assets/icons/users.svg",
+                  "title": "A Professional Network",
+                  "text": "Dealers, designers, workrooms, fabricators, and installers — all in one room."
+                },
+                {
+                  "icon": "assets/icons/map-pin.svg",
+                  "title": "Local to Our Region",
+                  "text": "Serving Southeastern Pennsylvania and New Jersey, with events close to home."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "blocks": [
+            {
+              "type": "split",
+              "columns": "0.9fr 1.4fr",
+              "gap": "var(--space-12)",
+              "align": "start",
+              "left": [
+                {
+                  "type": "heading",
+                  "align": "left",
+                  "kicker": "Around the Chapter",
+                  "title": "Recent Events",
+                  "lede": "We meet monthly — typically a Thursday morning — announced via email, Facebook, and Instagram.",
+                  "flush": true
+                }
+              ],
+              "right": [
+                {
+                  "type": "group",
+                  "gap": "var(--space-4)",
+                  "blocks": [
+                    {
+                      "type": "events",
+                      "gap": "var(--space-4)",
+                      "items": [
+                        {
+                          "month": "Jun",
+                          "day": "18",
+                          "badge": "Zoom",
+                          "title": "Centurion Roman Shade: Elevated Designs",
+                          "time": "9:30 AM ET",
+                          "location": "Zoom",
+                          "description": "Elevated Roman shade techniques — relaxed and hobbled styles, top-down/bottom-up functionality, and more.",
+                          "href": "events.html"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "buttons",
+                      "layout": "plain",
+                      "items": [
+                        { "label": "All Chapter Events", "href": "events.html", "variant": "outline", "size": "sm" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tint": true,
+          "blocks": [
+            {
+              "type": "heading",
+              "kicker": "@wcaasepanjchapter",
+              "title": "Follow Along",
+              "lede": "Photos from meetings, workroom tours, and member socials."
+            },
+            {
+              "type": "gallery",
+              "columns": 4,
+              "aspect": "1 / 1",
+              "items": [
+                { "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_0.webp", "alt": "Samuel & Sons showroom tour, NYC" },
+                { "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_1.webp", "alt": "Trim workshop at Stout Textiles" },
+                { "src": "uploads/wcaa-instagram-photos/30_DQsWOH8jhpS_1.webp", "alt": "Membership table at the Fall Table Top Show" },
+                { "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__0.webp", "alt": "Holiday cookie-decorating social" }
+              ]
+            },
+            {
+              "type": "buttons",
+              "layout": "center",
+              "marginTop": "var(--space-8)",
+              "items": [
+                {
+                  "label": "Follow on Instagram",
+                  "href": "https://www.instagram.com/wcaasepanjchapter/",
+                  "variant": "outline",
+                  "icon": "assets/icons/instagram.svg",
+                  "iconSize": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "dark": true,
+          "tight": true,
+          "blocks": [
+            {
+              "type": "heading",
+              "onDark": true,
+              "kicker": "Membership",
+              "title": "Take your business to new heights",
+              "lede": "Join the WCAA New Jersey & Southeastern Pennsylvania Chapter community.",
+              "marginBottom": "var(--space-6)"
+            },
+            {
+              "type": "buttons",
+              "layout": "center",
+              "items": [
+                { "label": "Join / Renew Today", "href": "join.html", "variant": "gold", "size": "lg" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "slug": "about",
+      "navHref": "about.html",
+      "title": "About Us — WCAA NJ & Southeastern PA Chapter",
+      "hero": { "variant": "page", "kicker": "Our Chapter", "title": "About Us" },
+      "sections": [
+        {
+          "narrow": true,
+          "blocks": [
+            {
+              "type": "group",
+              "marginBottom": "var(--space-16)",
+              "blocks": [
+                {
+                  "type": "heading",
+                  "align": "left",
+                  "size": "sm",
+                  "title": "WCAA — New Jersey & Southeastern Pennsylvania Chapter"
+                },
+                {
+                  "type": "text",
+                  "size": "md",
+                  "flush": true,
+                  "text": "We are proud members of the Window Coverings Association of America, the only national non-profit trade association dedicated to the retail window coverings industry and to the dealers, designers, decorators, workrooms, fabricators, and installers that are our members. We meet monthly — typically on a Thursday morning — and meetings are announced via email, our Facebook page, Instagram, and the Events page."
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "marginBottom": "var(--space-16)",
+              "blocks": [
+                { "type": "heading", "align": "left", "size": "sm", "title": "Mission Statement" },
+                {
+                  "type": "text",
+                  "size": "md",
+                  "flush": true,
+                  "text": "Our mission is to make available educational opportunities in the window coverings and interior fashions professions, to encourage a code of ethics for fair business practice in the industry, and to work for the betterment of the industry."
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "blocks": [
+                { "type": "heading", "align": "left", "size": "sm", "title": "Our Goals" },
+                {
+                  "type": "list",
+                  "icon": "assets/icons/chevron-right.svg",
+                  "items": [
+                    "To promote professionalism in the industry",
+                    "To provide a common voice for the interests of independent retailers",
+                    "To aid in the success and profitability of our members"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tint": true,
+          "tight": true,
+          "blocks": [
+            {
+              "type": "heading",
+              "kicker": "Leadership",
+              "title": "Chapter Officers",
+              "lede": "Questions about the chapter or membership? Reach out — we'd love to hear from you."
+            },
+            {
+              "type": "officers",
+              "items": [
+                { "name": "Marie Weaverling", "role": "Chapter President", "phone": "(610) 331-5474" }
+              ]
+            },
+            {
+              "type": "iconRows",
+              "layout": "inline",
+              "marginTop": "var(--space-8)",
+              "items": [
+                { "icon": "assets/icons/clock.svg", "lines": [[{ "text": "Monthly chapter meetings" }]] },
+                { "icon": "assets/icons/map-pin.svg", "lines": [[{ "text": "New Jersey & Southeastern Pennsylvania" }]] },
+                { "icon": "assets/icons/mail.svg", "lines": [[{ "text": "Announced by email & social" }]] }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "slug": "events",
+      "navHref": "events.html",
+      "title": "Chapter Events — WCAA NJ & Southeastern PA Chapter",
+      "hero": { "variant": "page", "kicker": "Calendar", "title": "Chapter Events" },
+      "sections": [
+        {
+          "narrow": true,
+          "blocks": [
+            {
+              "type": "heading",
+              "title": "Recent Events",
+              "lede": "We meet monthly — typically a Thursday morning. New meetings are announced via email, our Facebook page, and @wcaasepanjchapter."
+            },
+            {
+              "type": "events",
+              "gap": "var(--space-5)",
+              "items": [
+                {
+                  "month": "Jun",
+                  "day": "18",
+                  "badge": "Zoom",
+                  "title": "Centurion Roman Shade: Elevated Designs",
+                  "time": "9:30 AM ET",
+                  "location": "Zoom",
+                  "description": "Expert techniques and elevated design details — relaxed and hobbled styles, top-down/bottom-up functionality, and the Centurion widget kit. Presented with the New Hampshire chapter."
+                },
+                {
+                  "month": "Apr",
+                  "day": "16",
+                  "badge": "In Person",
+                  "title": "Lafayette Interior Fashions",
+                  "time": "10:30 AM",
+                  "location": "Phillips Workroom, Chadds Ford, PA",
+                  "description": "An extensive range of customizable window treatments — and how a Lafayette partnership can complement your business. Lunch served after the presentation."
+                },
+                {
+                  "month": "Mar",
+                  "day": "11",
+                  "badge": "Membership Drive",
+                  "title": "Designing with Motorized Shading — LuAnn Nigara",
+                  "time": "10:00 AM – 1:30 PM",
+                  "location": "Del Motorized Solutions, Bensalem, PA",
+                  "description": "Sales, programming, fabrication methods, and installation tips from Lutron experts, with guest speaker LuAnn Nigara. Giveaways and light lunch provided."
+                },
+                {
+                  "month": "Feb",
+                  "day": "19",
+                  "badge": "In Person + Zoom",
+                  "title": "Live Q&A with Master Installer Shawn Yett",
+                  "time": "10:30 AM",
+                  "location": "R Garner Custom Designs",
+                  "description": "Advanced installation techniques and troubleshooting for interior designers, workrooms, and window treatment specialists."
+                },
+                {
+                  "month": "Jan",
+                  "day": "15",
+                  "badge": "In Person",
+                  "title": "Experience Trivantage: Presentation, Tour & Lunch",
+                  "time": "10:30 AM",
+                  "location": "Trivantage, Somerset, NJ",
+                  "description": "High-quality fabrics, threads, tools, and workroom supplies with Lisa Campbell, Market Manager – Workrooms."
+                }
+              ]
+            },
+            {
+              "type": "buttons",
+              "layout": "row",
+              "marginTop": "var(--space-12)",
+              "gap": "var(--space-4)",
+              "items": [
+                {
+                  "label": "Follow for Announcements",
+                  "href": "https://www.instagram.com/wcaasepanjchapter/",
+                  "variant": "outline",
+                  "icon": "assets/icons/instagram.svg",
+                  "iconSize": 16
+                },
+                { "label": "Ask About a Meeting", "href": "contact.html" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "slug": "gallery",
+      "navHref": "gallery.html",
+      "title": "Gallery — WCAA NJ & Southeastern PA Chapter",
+      "hero": { "variant": "page", "kicker": "Chapter Life", "title": "Gallery" },
+      "sections": [
+        {
+          "blocks": [
+            {
+              "type": "heading",
+              "title": "Photos From Around the Chapter",
+              "lede": "Meetings, workroom tours, trainings, and socials across New Jersey and Southeastern PA."
+            },
+            {
+              "type": "gallery",
+              "columns": 3,
+              "items": [
+                { "src": "uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_1.webp", "alt": "Trivantage presentation — chapter meeting" },
+                { "src": "uploads/wcaa-instagram-photos/10_DXPGedUDjPO_0.webp", "alt": "Lafayette Interior Fashions at Phillips Workroom" },
+                { "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_3.webp", "alt": "Passementerie at Samuel & Sons" },
+                { "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_2.webp", "alt": "Trim sample boards" },
+                { "src": "uploads/wcaa-instagram-photos/14_DVzrjrFDn_S_1.webp", "alt": "DEL Motorized Solutions event" },
+                { "src": "uploads/wcaa-instagram-photos/06_DYUdni2Dq_y_1.webp", "alt": "Samuel & Sons, New York City" },
+                { "src": "uploads/wcaa-instagram-photos/30_DQsWOH8jhpS_0.webp", "alt": "Members at the Fall Table Top Show" },
+                { "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_3.webp", "alt": "Fabric warehouse tour" },
+                { "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__1.webp", "alt": "Holiday cookie-decorating workshop" }
+              ]
+            },
+            {
+              "type": "buttons",
+              "layout": "center",
+              "marginTop": "var(--space-10)",
+              "items": [
+                {
+                  "label": "Follow @wcaasepanjchapter",
+                  "href": "https://www.instagram.com/wcaasepanjchapter/",
+                  "variant": "outline",
+                  "icon": "assets/icons/instagram.svg",
+                  "iconSize": 16
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "slug": "contact",
+      "navHref": "contact.html",
+      "title": "Contact Us — WCAA NJ & Southeastern PA Chapter",
+      "hero": { "variant": "page", "kicker": "Say Hello", "title": "Contact Us" },
+      "sections": [
+        {
+          "blocks": [
+            {
+              "type": "split",
+              "columns": "1.2fr 1fr",
+              "gap": "var(--space-16)",
+              "align": "start",
+              "maxWidth": "1000px",
+              "centered": true,
+              "left": [
+                {
+                  "type": "contactForm",
+                  "heading": "We'd like to communicate with you!",
+                  "submitLabel": "Send",
+                  "note": "This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply."
+                }
+              ],
+              "right": [
+                {
+                  "type": "heading",
+                  "align": "left",
+                  "size": "sm",
+                  "title": "Chapter Contact",
+                  "lede": "We meet monthly and invite you to contact us about membership."
+                },
+                {
+                  "type": "iconRows",
+                  "layout": "stack",
+                  "items": [
+                    {
+                      "icon": "assets/icons/phone.svg",
+                      "lines": [
+                        [{ "text": "Marie Weaverling", "strong": true }, { "text": ", Chapter President" }],
+                        [{ "text": "(610) 331-5474" }]
+                      ]
+                    },
+                    {
+                      "icon": "assets/icons/instagram.svg",
+                      "lines": [
+                        [{ "text": "@wcaasepanjchapter", "href": "https://www.instagram.com/wcaasepanjchapter/", "external": true }]
+                      ]
+                    },
+                    {
+                      "icon": "assets/icons/map-pin.svg",
+                      "lines": [[{ "text": "Serving New Jersey & Southeastern Pennsylvania" }]]
+                    }
+                  ]
+                },
+                {
+                  "type": "buttons",
+                  "layout": "plain",
+                  "marginTop": "var(--space-6)",
+                  "items": [
+                    {
+                      "label": "Follow Our Chapter",
+                      "href": "https://www.instagram.com/wcaasepanjchapter/",
+                      "variant": "outline",
+                      "size": "sm"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "slug": "join",
+      "navHref": "join.html",
+      "title": "Join / Renew — WCAA NJ & Southeastern PA Chapter",
+      "hero": { "variant": "page", "kicker": "Membership", "title": "Join / Renew" },
+      "sections": [
+        {
+          "narrow": true,
+          "blocks": [
+            {
+              "type": "text",
+              "align": "center",
+              "size": "md",
+              "marginBottom": "var(--space-4)",
+              "text": "We're excited to welcome both new and returning members to the WCAA New Jersey & Southeastern Pennsylvania Chapter. Our local community brings together window covering professionals who value education, collaboration, and connection within the industry."
+            },
+            {
+              "type": "text",
+              "align": "center",
+              "muted": true,
+              "flush": true,
+              "spans": [
+                { "text": "Chapter membership requires an " },
+                { "text": "active WCAA National membership", "strong": true, "heading": true },
+                { "text": ". New to WCAA? Start with Step 1." }
+              ]
+            }
+          ]
+        },
+        {
+          "tint": true,
+          "tight": true,
+          "blocks": [
+            {
+              "type": "cards",
+              "columns": 2,
+              "marker": "number",
+              "maxWidth": "880px",
+              "items": [
+                {
+                  "n": "1",
+                  "title": "Join WCAA National",
+                  "text": "Become (or confirm you are) a member of the Window Coverings Association of America — it's the prerequisite for every local chapter.",
+                  "action": {
+                    "label": "WCAA National",
+                    "href": "https://www.wcaa.org/",
+                    "variant": "outline",
+                    "iconAfter": "assets/icons/external-link.svg",
+                    "iconSize": 14
+                  }
+                },
+                {
+                  "n": "2",
+                  "title": "Pay Chapter Dues",
+                  "text": "Once your National membership is active, select and pay your NJ/SEPA Chapter dues using the buttons below.",
+                  "action": { "label": "See Dues Below", "href": "#join-dues", "variant": "outline" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "narrow": true,
+          "blocks": [
+            {
+              "type": "heading",
+              "title": "Pay Annual Dues Here",
+              "lede": "Please use these buttons to join or renew your membership."
+            },
+            {
+              "type": "buttons",
+              "id": "join-dues",
+              "layout": "stack",
+              "gap": "var(--space-4)",
+              "maxWidth": "520px",
+              "items": [
+                { "label": "Individual Membership Dues", "size": "lg", "fullWidth": true },
+                { "label": "Corporate Membership Dues (Includes 2 Members)", "size": "lg", "fullWidth": true },
+                { "label": "Add-on Employee (Corporate Members Only)", "variant": "outline", "fullWidth": true }
+              ]
+            }
+          ]
+        },
+        {
+          "dark": true,
+          "tight": true,
+          "blocks": [
+            {
+              "type": "heading",
+              "onDark": true,
+              "title": "Join now and take your business to new heights!",
+              "marginBottom": "var(--space-6)"
+            },
+            {
+              "type": "buttons",
+              "layout": "center",
+              "items": [
+                { "label": "Contact Us About Membership", "href": "contact.html", "variant": "gold", "size": "lg" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

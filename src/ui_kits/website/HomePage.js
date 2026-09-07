@@ -185,7 +185,7 @@ function HomePage({
   }, /*#__PURE__*/React.createElement(__ds_scope.Icon, {
     src: IC + "instagram.svg",
     size: 16
-  }), " Follow on Instagram"))), /*#__PURE__*/React.createElement(__ds_scope.Section, {
+  }), " Follow on Instagram"))), /*#__PURE__*/React.createElement(__ds_scope.DynamicSections, null), /*#__PURE__*/React.createElement(__ds_scope.Section, {
     dark: true,
     tight: true
   }, /*#__PURE__*/React.createElement(__ds_scope.SectionHeading, {

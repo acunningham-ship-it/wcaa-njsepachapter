@@ -460,6 +460,136 @@ async function signIn(event) {
 
 /* ---------- boot ---------- */
 
+/* ---------- events & registrations (D1, NOT content) ----------
+   Content is the public site (committed, world-readable). This is registration
+   STATE for the events that take RSVPs — it lives in D1, never touches the repo
+   (see functions/api/rsvp.js). Opening an event here is what lets the public RSVP
+   form on the Events page accept sign-ups; the form binds to the event's id. */
+
+function setMode(m) {
+  const content = m === 'content';
+  $('.cols').hidden = !content;
+  $('#events-view').hidden = content;
+  $('#mode-content').classList.toggle('is-on', content);
+  $('#mode-events').classList.toggle('is-on', !content);
+  $('#save').hidden = !content;      // "Save changes" is the content editor's; irrelevant here
+  $('#status').hidden = !content;
+  if (!content) loadEvents();
+}
+
+async function loadEvents() {
+  const view = $('#events-view');
+  view.textContent = '';
+  view.append(el('div', { className: 'ev-intro' }, [
+    el('h2', { className: 'ev-h', textContent: 'Event registration' }),
+    el('p', { className: 'hint', textContent: 'Open an event here so the RSVP form on the Events page can take sign-ups. The form binds to the event’s id — use that same id in the Upcoming Event block on the Events page.' }),
+  ]));
+  view.append(openForm());
+  const list = el('div', { className: 'ev-list', textContent: 'Loading…' });
+  view.append(list);
+  let events = [];
+  try { const r = await fetch('../api/events').then((x) => x.json()); events = r.ok ? r.events : []; }
+  catch { list.textContent = 'Couldn’t load events.'; return; }
+  list.textContent = '';
+  if (!events.length) { list.append(el('p', { className: 'empty', textContent: 'No events yet — open registration for one above.' })); return; }
+  events.forEach((ev) => list.append(eventCard(ev)));
+}
+
+function evField(label, control, hint) {
+  const kids = [el('span', { className: 'field-label', textContent: label }), control];
+  if (hint) kids.push(el('span', { className: 'field-hint', textContent: hint }));
+  return el('label', { className: 'field' }, kids);
+}
+
+function openForm() {
+  const id = el('input', { className: 'input', placeholder: '2026-10-roman-shade', required: true });
+  const title = el('input', { className: 'input', placeholder: 'Roman Shade Workshop', required: true });
+  const cap = el('input', { className: 'input', type: 'number', min: '1', placeholder: 'no limit' });
+  const msg = el('p', { className: 'ev-msg' });
+  const form = el('form', { className: 'ev-open' }, [
+    el('div', { className: 'ev-open-row' }, [
+      evField('Event id', id, 'lowercase, no spaces — the public form binds to this'),
+      evField('Title', title),
+      evField('Capacity', cap, 'total seats incl. guests; blank = unlimited'),
+    ]),
+    el('div', { className: 'ev-open-actions' }, [
+      el('button', { className: 'btn btn--primary', type: 'submit', textContent: 'Open registration' }),
+      msg,
+    ]),
+  ]);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = { id: id.value.trim(), title: title.value.trim() };
+    if (cap.value.trim()) body.capacity = Number(cap.value.trim());
+    msg.textContent = 'Opening…'; msg.className = 'ev-msg';
+    let r;
+    try { r = await fetch('../api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.json()); }
+    catch { msg.textContent = 'Network error — try again.'; msg.className = 'ev-msg ev-msg--bad'; return; }
+    if (!r.ok) { msg.textContent = r.error || 'Couldn’t open it.'; msg.className = 'ev-msg ev-msg--bad'; return; }
+    id.value = ''; title.value = ''; cap.value = ''; msg.textContent = '';
+    loadEvents();
+  });
+  return form;
+}
+
+function eventCard(ev) {
+  const seats = ev.seats || 0;
+  const closed = !!ev.closed;
+  const badge = el('span', { className: 'ev-badge ' + (closed ? 'ev-badge--closed' : 'ev-badge--open'), textContent: closed ? 'Closed' : 'Open' });
+  const count = el('span', { className: 'ev-seats', textContent: ev.capacity ? `${seats} / ${ev.capacity} seats` : `${seats} seat${seats === 1 ? '' : 's'}` });
+  const toggle = el('button', { className: 'ev-btn', type: 'button', textContent: closed ? 'Reopen' : 'Close' });
+  toggle.addEventListener('click', async () => {
+    toggle.disabled = true;
+    try { await fetch('../api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id, title: ev.title, capacity: ev.capacity, closed: closed ? 0 : 1 }) }); } catch {}
+    loadEvents();
+  });
+  const box = el('div', { className: 'ev-rsvps', hidden: true });
+  const view = el('button', { className: 'ev-btn', type: 'button', textContent: `Sign-ups (${seats})` });
+  view.addEventListener('click', () => { box.hidden = !box.hidden; if (!box.hidden) loadRsvps(ev, box); });
+  return el('div', { className: 'ev-card' }, [
+    el('div', { className: 'ev-card-head' }, [
+      el('div', { className: 'ev-card-title' }, [el('span', { className: 'ev-name', textContent: ev.title }), el('code', { className: 'ev-id', textContent: ev.id })]),
+      badge, count,
+      el('div', { className: 'ev-actions' }, [view, toggle]),
+    ]),
+    box,
+  ]);
+}
+
+async function loadRsvps(ev, box) {
+  box.textContent = 'Loading…';
+  let data;
+  try { data = await fetch('../api/rsvps?event_id=' + encodeURIComponent(ev.id)).then((x) => x.json()); }
+  catch { box.textContent = 'Couldn’t load sign-ups.'; return; }
+  const rsvps = data.ok ? data.rsvps : [];
+  box.textContent = '';
+  const csv = el('a', { className: 'ev-btn ev-btn--sm', href: '../api/rsvps?format=csv&event_id=' + encodeURIComponent(ev.id), textContent: 'Export CSV' });
+  box.append(el('div', { className: 'ev-rsvps-head' }, [el('span', { textContent: `${rsvps.length} sign-up${rsvps.length === 1 ? '' : 's'}` }), rsvps.length ? csv : el('span')]));
+  if (!rsvps.length) { box.append(el('p', { className: 'empty', textContent: 'No sign-ups yet.' })); return; }
+  rsvps.forEach((r) => box.append(rsvpRow(r, ev, box)));
+}
+
+function rsvpRow(r, ev, box) {
+  const guests = r.guests ? ` +${r.guests}` : '';
+  const del = el('button', { className: 'ev-x', type: 'button', title: 'Remove this registration', textContent: '✕' });
+  del.addEventListener('click', async () => {
+    if (!confirm(`Remove ${r.name}’s registration?`)) return;
+    del.disabled = true;
+    let res;
+    try { res = await fetch('../api/rsvps/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id }) }).then((x) => x.json()); }
+    catch { del.disabled = false; return; }
+    if (res.ok) loadRsvps(ev, box); else { del.disabled = false; alert(res.error || 'Couldn’t remove it.'); }
+  });
+  return el('div', { className: 'ev-rsvp' }, [
+    el('div', { className: 'ev-rsvp-main' }, [
+      el('span', { className: 'ev-rsvp-name', textContent: r.name + guests }),
+      el('a', { className: 'ev-rsvp-email', href: 'mailto:' + r.email, textContent: r.email }),
+    ]),
+    el('span', { className: 'ev-rsvp-meta', textContent: [r.phone, r.business].filter(Boolean).join(' · ') }),
+    del,
+  ]);
+}
+
 function render() {
   renderOutline();
   renderEditor();
@@ -479,6 +609,8 @@ window.addEventListener('beforeunload', (e) => {
 
 $('#signin-form').addEventListener('submit', signIn);
 $('#save').addEventListener('click', saveSite);
+$('#mode-content').addEventListener('click', () => setMode('content'));
+$('#mode-events').addEventListener('click', () => setMode('events'));
 
 /* The session cookie is HttpOnly, so the page cannot read it. /api/session is the
    honest way to ask — rather than probing some other endpoint and inferring the

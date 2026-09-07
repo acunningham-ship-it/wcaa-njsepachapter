@@ -2,7 +2,6 @@
   "components/content/GalleryGrid.jsx",
   "components/content/Hero.jsx",
   "components/content/OfficerCard.jsx",
-  "components/content/DynamicSections.jsx",
   "components/core/Badge.jsx",
   "components/content/EventCard.jsx",
   "components/core/Button.jsx",

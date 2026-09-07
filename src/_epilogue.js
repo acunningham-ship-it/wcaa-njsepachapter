@@ -36,8 +36,6 @@ __ds_ns.JoinPage = __ds_scope.JoinPage;
 
 __ds_ns.Section = __ds_scope.Section;
 
-__ds_ns.DynamicSections = __ds_scope.DynamicSections;
-
 __ds_ns.WebsiteApp = __ds_scope.WebsiteApp;
 
 })();

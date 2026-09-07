@@ -270,9 +270,23 @@ const content = JSON.parse(read('content/pages.json'));
 /* ---------- 5. the Turnstile widget is gated on a configured site key ---------- */
 {
   const page = content.pages.find((pg) => pg.slug === 'contact');
-  const withoutKey = renderPage(page, site);
+  /* ⛔ Build the keyless case EXPLICITLY. This used to pass `site` straight through
+     and call it "no key configured", which was true only because site.json happened
+     not to have one yet — so the moment the real key was configured the test failed,
+     having never actually tested the gate it is named after. A fixture that depends
+     on production config is not a fixture. */
+  const { turnstileSiteKey: _configured, ...siteNoKey } = site;
+  const withoutKey = renderPage(page, siteNoKey);
   ok('no site key configured means NO widget is rendered',
      !withoutKey.includes('cf-turnstile'), withoutKey.slice(withoutKey.indexOf('<form'), 200));
+
+  /* ...and the live configuration is now itself under test, in the other direction:
+     the deployed site must actually carry a widget on every page that has a form. */
+  const live = renderSite(content, site);
+  const formPages = Object.entries(live).filter(([, h]) => h.includes('data-endpoint='));
+  ok('the CONFIGURED key renders a widget on every page that carries a form',
+     formPages.length > 0 && formPages.every(([, h]) => h.includes('class="cf-turnstile"')),
+     formPages.map(([n, h]) => `${n}:${h.includes('cf-turnstile')}`));
 
   const withKey = renderPage(page, { ...site, turnstileSiteKey: '0x4AAAAAAABkMYinukE8nzYS' });
   ok('a configured site key renders the widget',

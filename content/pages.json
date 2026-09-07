@@ -526,8 +526,7 @@
                 {
                   "type": "contactForm",
                   "heading": "We'd like to communicate with you!",
-                  "submitLabel": "Send",
-                  "note": "This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply."
+                  "submitLabel": "Send"
                 }
               ],
               "right": [

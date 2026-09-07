@@ -47,7 +47,32 @@ for (const [name, html] of Object.entries(pages)) {
   }
 }
 
+/* ---------- deploy precondition: a form on the page needs a key behind it ----------
+   ⛔ A page can carry a complete-looking form with NO Turnstile widget, because the
+   widget is gated on a configured site key and the form is not. Deployed in that
+   state the visitor fills the form in, submits with no token, and /api/contact
+   fails closed — so they get "We couldn't verify that you're human. Please reload
+   the page and try once more." forever, and reloading cannot help, because there is
+   no widget to produce a token. Verified against the live Worker, not reasoned about.
+
+   This is a WARNING here and not a failing unit test on purpose: "the forms exist,
+   the client hasn't issued a key yet" is a legitimate state to sit in for days. It
+   stops being legitimate at deploy, which is where this runs. */
+{
+  const keyed = /^[A-Za-z0-9_-]{8,64}$/.test(String(site.turnstileSiteKey || '').trim());
+  const withForms = Object.entries(pages)
+    .filter(([, html]) => html.includes('data-endpoint='))
+    .map(([name]) => name);
+  if (withForms.length && !keyed) {
+    const carry = withForms.length === 1 ? 'carries a form' : 'carry forms';
+    console.log(`\n⛔ ${withForms.join(', ')} ${carry} and content/site.json has no valid`);
+    console.log('   turnstileSiteKey. Deployed like this every submission fails closed and the');
+    console.log('   visitor is told to reload, which cannot fix it. Set the key before pushing.');
+    if (check) process.exitCode = 1;
+  }
+}
+
 if (check) {
   console.log(drift ? `\n${drift} file(s) differ from content/` : '\nno drift');
-  process.exit(drift ? 1 : 0);
+  process.exit(drift ? 1 : (process.exitCode || 0));
 }

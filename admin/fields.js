@@ -114,6 +114,13 @@ export const FIELDS = {
     { key: 'submitLabel', kind: 'text', label: 'Button text' },
     { key: 'note', kind: 'long', label: 'Small print' },
   ],
+  rsvpForm: [
+    { key: 'eventId', kind: 'text', label: 'Event id', required: true,
+      hint: 'Must match an event you have opened for registration' },
+    { key: 'heading', kind: 'text', label: 'Form heading' },
+    { key: 'submitLabel', kind: 'text', label: 'Button text' },
+    { key: 'successMessage', kind: 'long', label: 'Message after they register' },
+  ],
   group: [
     { key: 'gap', kind: 'select', label: 'Space between blocks', options: SPACING },
     { key: 'marginBottom', kind: 'select', label: 'Space below', options: SPACING },
@@ -140,7 +147,8 @@ export const BLOCK_LABELS = {
   list:        ['Bulleted list',  'Short points with an icon bullet'],
   officers:    ['Officers',       'Chapter officers with contact details'],
   iconRows:    ['Icon rows',      'Lines of text, each with an icon'],
-  contactForm: ['Contact form',   'The form that emails the chapter'],
+  contactForm: ['Contact form',   'The form that sends the chapter a message'],
+  rsvpForm:    ['Event sign-up',  'Lets people register for one event'],
   group:       ['Group',          'Holds other blocks together'],
   split:       ['Two columns',    'Two columns, each holding its own blocks'],
 };
@@ -162,6 +170,10 @@ export const BLOCK_DEFAULTS = {
   iconRows:    () => ({ type: 'iconRows', layout: 'stack',
                         items: [{ icon: 'assets/icons/mail.svg', lines: [[{ text: 'Text' }]] }] }),
   contactForm: () => ({ type: 'contactForm', heading: 'Get in touch', submitLabel: 'Send' }),
+  /* No event id by default: the block renders nothing until one is set, which is
+     right — a sign-up form pointing at no event would take registrations the
+     endpoint then refuses. The editor's required marker is what prompts for it. */
+  rsvpForm:    () => ({ type: 'rsvpForm', heading: 'Reserve your place', submitLabel: 'Reserve my place' }),
   group:       () => ({ type: 'group', blocks: [] }),
   split:       () => ({ type: 'split', columns: '1fr 1fr', left: [], right: [] }),
 };

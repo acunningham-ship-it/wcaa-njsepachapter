@@ -125,6 +125,8 @@ const content = JSON.parse(read('content/pages.json'));
             items: [{ icon: BAD_SRC, lines: [[{ text: XSS, href: BAD_URL, external: true }]] }] },
           { type: 'iconRows', layout: 'inline', items: [{ icon: BAD_SRC, lines: [[{ text: XSS }]] }] },
           { type: 'contactForm', heading: XSS, submitLabel: XSS, note: XSS },
+          { type: 'rsvpForm', eventId: 'jun-18', heading: XSS, submitLabel: XSS, successMessage: XSS },
+          { type: 'rsvpForm', eventId: XSS, heading: XSS },
           { type: 'group', marginBottom: BAD_STYLE, blocks: [{ type: 'text', text: XSS }] },
           { type: 'split', columns: BAD_STYLE, gap: BAD_STYLE, maxWidth: BAD_STYLE,
             left: [{ type: 'text', text: XSS }], right: [{ type: 'text', text: XSS }] },
@@ -143,7 +145,17 @@ const content = JSON.parse(read('content/pages.json'));
   const html = renderSite(hostile, hostileSite)['xss.html'];
 
   ok('hostile content still renders a page', typeof html === 'string' && html.length > 2000);
-  ok('no <script> tag survives', !/<script/i.test(html));
+  /* This page carries forms, so it legitimately loads the two permitted scripts.
+     What must never happen is a script the CONTENT introduced — so check the
+     script tags structurally: no inline body, and no src outside the allowlist. */
+  {
+    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+    const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
+    ok('the payload introduced no script',
+       scripts.every((m) => m[2].trim() === '') &&
+       srcs.every((u) => u === 'js/forms.js' || u === 'https://challenges.cloudflare.com/turnstile/v0/api.js'),
+       { srcs, inline: scripts.map((m) => m[2].slice(0, 30)) });
+  }
   ok('the payload never becomes real markup', html.indexOf('<img src=x') === -1);
   ok('no javascript: URL survives', !/javascript:/i.test(html));
   ok('no path traversal survives', html.indexOf('..') === -1);
@@ -163,8 +175,19 @@ const content = JSON.parse(read('content/pages.json'));
   const tags = html.match(/<[a-z][^>]*>/gi) || [];
   const unbalanced = tags.filter((t) => (t.match(/"/g) || []).length % 2 !== 0);
   ok('every tag has balanced attribute quotes', unbalanced.length === 0, unbalanced.slice(0, 3));
-  const handlers = tags.filter((t) => /\son[a-z]+\s*=/i.test(t));
-  ok('no tag carries an event-handler attribute', handlers.length === 0, handlers.slice(0, 3));
+  /* Parse attribute NAMES rather than scanning the tag text.
+     ⛔ A bare /\son[a-z]+=/ scan reports a false positive the moment a payload
+     lands inside an attribute VALUE: data-success="&lt;img src=x onerror=..." is
+     one attribute whose value happens to contain those characters, escaped and
+     inert. The name/value regex below consumes each quoted value whole, so it
+     can only ever match a real attribute name. Verified by hand on the rendered
+     <form>: six attributes, none beginning "on", quotes balanced. */
+  const attrNames = (tag) => [...tag.matchAll(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*"[^"]*"/g)].map((m) => m[1]);
+  const handlers = tags.filter((t) => attrNames(t).some((n) => /^on/i.test(n)));
+  ok('no tag carries an event-handler attribute', handlers.length === 0, handlers.slice(0, 2));
+  // Control: the extractor really does see attributes, so this cannot pass by finding none.
+  ok('the attribute extractor works (control)',
+     attrNames('<a class="x" href="y" onclick="z">').join(',') === 'class,href,onclick');
   const styled = tags.filter((t) => /style="[^"]*(url\(\s*['"]?https?:|expression\()/i.test(t));
   ok('no style attribute fetches a remote resource', styled.length === 0, styled.slice(0, 3));
 
@@ -207,8 +230,29 @@ const content = JSON.parse(read('content/pages.json'));
      { found: (p['404.html'].match(/class="wcaa-nav__link"/g) || []).length, expected: site.nav.length });
 
   const navHrefs = site.nav.map((l) => l.href);
+  /* The two allowed scripts, and only on a page that carries a form. Turnstile
+     needs JavaScript, so a bot-gated form has no JS-free path — but that is no
+     reason for the other pages to pay for it, so this is asserted PER PAGE.
+     ⛔ Not "does the site ship JS" but "which page ships what": a site-wide check
+     would have gone quietly permissive the moment one page needed a script. */
+  const ALLOWED_SRC = [
+    'https://challenges.cloudflare.com/turnstile/v0/api.js',
+    'js/forms.js',
+  ];
   for (const [name, html] of Object.entries(p)) {
-    ok(`${name} ships no JavaScript`, !/<script/i.test(html) && !/ on[a-z]+=/i.test(html));
+    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+    const hasForm = /<form\b/i.test(html);
+    ok(`${name} has no inline script and no event-handler attributes`,
+       scripts.every((m) => m[2].trim() === '') && !/ on[a-z]+=/i.test(html),
+       scripts.map((m) => m[2].slice(0, 40)));
+    const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
+    ok(`${name} loads only permitted scripts`, srcs.every((u) => ALLOWED_SRC.includes(u)), srcs);
+    if (hasForm) {
+      ok(`${name} has a form, so it loads both form scripts`,
+         ALLOWED_SRC.every((u) => srcs.includes(u)), srcs);
+    } else {
+      ok(`${name} has no form, so it ships NO script at all`, scripts.length === 0, srcs);
+    }
     /* A page highlights its own nav link, and only pages that ARE in the nav can.
        join.html and 404.html are reachable but not nav entries, so zero is right
        for them — derived from site.json rather than a list of exceptions. */
@@ -221,6 +265,39 @@ const content = JSON.parse(read('content/pages.json'));
      (p['gallery.html'].match(/<img /g) || []).length === (p['gallery.html'].match(/<img [^>]*alt="/g) || []).length);
   ok('gallery renders all nine photos', (p['gallery.html'].match(/<figure /g) || []).length === 9);
   ok('events page renders all five events', (p['events.html'].match(/<article /g) || []).length === 5);
+}
+
+/* ---------- 5. the Turnstile widget is gated on a configured site key ---------- */
+{
+  const page = content.pages.find((pg) => pg.slug === 'contact');
+  const withoutKey = renderPage(page, site);
+  ok('no site key configured means NO widget is rendered',
+     !withoutKey.includes('cf-turnstile'), withoutKey.slice(withoutKey.indexOf('<form'), 200));
+
+  const withKey = renderPage(page, { ...site, turnstileSiteKey: '0x4AAAAAAABkMYinukE8nzYS' });
+  ok('a configured site key renders the widget',
+     withKey.includes('class="cf-turnstile" data-sitekey="0x4AAAAAAABkMYinukE8nzYS"'), 'missing');
+  ok('the widget sits inside the form', withKey.indexOf('cf-turnstile') > withKey.indexOf('<form') &&
+     withKey.indexOf('cf-turnstile') < withKey.indexOf('</form>'));
+
+  /* A malformed key must render NOTHING rather than an empty widget: an empty
+     widget looks like a working form, submits with no token, and is refused by an
+     endpoint that fails closed — leaving an officer debugging a form that is
+     "broken" for no visible reason. */
+  for (const bad of ['', '   ', 'has spaces', '<script>', 'x', 'a'.repeat(200)]) {
+    ok(`a malformed site key ${JSON.stringify(bad.slice(0, 12))} renders no widget`,
+       !renderPage(page, { ...site, turnstileSiteKey: bad }).includes('cf-turnstile'));
+  }
+
+  // The form still posts to the endpoint either way — the gate is the widget, not the form.
+  ok('the form targets /api/contact with or without a key',
+     withoutKey.includes('data-endpoint="/api/contact"') && withKey.includes('data-endpoint="/api/contact"'));
+
+  // An rsvpForm with no event id renders nothing rather than a form that cannot work.
+  ok('an rsvpForm without an event id renders nothing',
+     renderBlocks([{ type: 'rsvpForm', heading: 'Register' }], site) === '');
+  ok('an rsvpForm with an event id renders a form',
+     renderBlocks([{ type: 'rsvpForm', eventId: 'jun-18' }], site).includes('name="event_id" value="jun-18"'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

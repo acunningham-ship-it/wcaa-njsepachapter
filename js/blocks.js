@@ -105,6 +105,46 @@ function buttonTag(b) {
   return '<button class="' + cls + '" type="button">' + inner + '</button>';
 }
 
+/* ---------- form fragments ---------- */
+
+/* A labelled input. Shared by both public forms so they cannot drift apart in
+   markup, validation attributes, or the way a required field is marked. */
+function formField(id, label, name, type, placeholder, required, extra) {
+  return (
+    '<div class="wcaa-field">' +
+    '<label class="wcaa-field__label" for="' + id + '">' + esc(label) +
+    (required ? '<span class="wcaa-field__req">*</span>' : '') + '</label>' +
+    '<input class="wcaa-field__input" id="' + id + '" name="' + name + '" type="' + type +
+    '" placeholder="' + esc(placeholder) + '"' + (required ? ' required' : '') + (extra || '') + '>' +
+    '</div>'
+  );
+}
+
+/* The Turnstile widget, and NOTHING when no site key is configured.
+   ⛔ Rendering an empty widget would be worse than rendering none: the form would
+   look complete, submit without a token, and be refused by the endpoint — which
+   fails closed — leaving a chapter officer to debug a form that is "broken" for
+   no visible reason. With no key the form still renders and still refuses; the
+   difference is that the refusal is honest rather than mysterious. */
+function turnstileWidget(site) {
+  const key = site && typeof site.turnstileSiteKey === 'string' ? site.turnstileSiteKey.trim() : '';
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(key)) return '';
+  return '<div class="cf-turnstile" data-sitekey="' + attr(key) + '" style="margin-bottom:var(--space-4)"></div>';
+}
+
+/* Does this page carry a form? Decides whether the page loads any script at all —
+   the content pages ship none, and that is asserted in tools/test-pages.mjs. */
+function pageHasForm(page) {
+  const scan = (blocks) => (Array.isArray(blocks) ? blocks : []).some((b) => {
+    if (!b || typeof b.type !== 'string') return false;
+    if (b.type === 'contactForm' || b.type === 'rsvpForm') return true;
+    if (b.type === 'group') return scan(b.blocks);
+    if (b.type === 'split') return scan(b.left) || scan(b.right);
+    return false;
+  });
+  return (Array.isArray(page.sections) ? page.sections : []).some((s) => scan(s && s.blocks));
+}
+
 /* ---------- blocks ---------- */
 
 const BLOCKS = {
@@ -365,42 +405,68 @@ const BLOCKS = {
 
   /* The field set is fixed on purpose — these four fields plus a message are
      what the chapter asks for, and a configurable form builder is a different
-     product. Officers get the heading, the button label and the footnote.
-     ⚠️ POSTs to /api/contact, which does not exist yet (step 2). This page must
-     not go live until it does. */
-  contactForm(b) {
-    const field = (id, label, name, type, placeholder, required) =>
-      '<div class="wcaa-field">' +
-      '<label class="wcaa-field__label" for="' + id + '">' + esc(label) +
-      (required ? '<span class="wcaa-field__req">*</span>' : '') + '</label>' +
-      '<input class="wcaa-field__input" id="' + id + '" name="' + name + '" type="' + type +
-      '" placeholder="' + esc(placeholder) + '"' + (required ? ' required' : '') + '>' +
-      '</div>';
+     product. Officers get the heading, the button label and the footnote. */
+  contactForm(b, site) {
     return (
-      '<form method="post" action="/api/contact" style="background:var(--surface-card);' +
-      'border-radius:var(--radius-md);box-shadow:var(--shadow-card);padding:var(--space-8)">' +
+      '<form class="wcaa-form" method="post" action="/api/contact" data-endpoint="/api/contact"' +
+      ' data-success="Thank you — we’ve received your message and will be in touch."' +
+      ' style="background:var(--surface-card);border-radius:var(--radius-md);' +
+      'box-shadow:var(--shadow-card);padding:var(--space-8)">' +
       '<h3 style="font-size:var(--text-xl);margin-bottom:var(--space-6)">' + esc(b.heading) + '</h3>' +
       '<div class="wcaa-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">' +
-      field('cf-name', 'Name', 'name', 'text', 'Your name', false) +
-      field('cf-business', 'Business Name', 'business', 'text', 'Workroom or studio', false) +
-      field('cf-email', 'Email', 'email', 'email', 'you@business.com', true) +
-      field('cf-phone', 'Telephone #', 'phone', 'tel', '(555) 555-5555', false) +
+      formField('cf-name', 'Name', 'name', 'text', 'Your name', false) +
+      formField('cf-business', 'Business Name', 'business', 'text', 'Workroom or studio', false) +
+      formField('cf-email', 'Email', 'email', 'email', 'you@business.com', true) +
+      formField('cf-phone', 'Telephone #', 'phone', 'tel', '(555) 555-5555', false) +
       '</div>' +
       '<div class="wcaa-field" style="margin-bottom:var(--space-6)">' +
       '<label class="wcaa-field__label" for="cf-message">Message</label>' +
       '<textarea class="wcaa-field__input" id="cf-message" name="message" rows="4" ' +
       'placeholder="How can we help?" style="resize:vertical"></textarea></div>' +
+      turnstileWidget(site) +
       '<button class="wcaa-btn wcaa-btn--primary wcaa-btn--md" type="submit">' +
       esc(b.submitLabel || 'Send') + '</button>' +
+      '<p class="wcaa-form__msg" role="status" hidden></p>' +
       (b.note ? '<p style="font-size:12px;color:var(--text-muted);margin:var(--space-4) 0 0">' + esc(b.note) + '</p>' : '') +
       '</form>'
     );
   },
 
-  /* A plain wrapper around a run of blocks. With `gap` it becomes a flex column,
-     which is how you space sibling blocks evenly — margins on the children would
-     collapse into each other and give you one gap where you asked for two. */
-  group(b) {
+  /* Event registration. Same shape as the contact form deliberately — one set of
+     field markup, one submit path, one place to get the escaping right.
+     `event_id` is a hidden field rather than part of the URL because the endpoint
+     fail-closes on an event that is not open, and a guessable id in a query
+     string invites people to probe for which ones exist. */
+  rsvpForm(b, site) {
+    const eventId = typeof b.eventId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(b.eventId) ? b.eventId : '';
+    if (!eventId) return '';
+    return (
+      '<form class="wcaa-form" method="post" action="/api/rsvp" data-endpoint="/api/rsvp"' +
+      ' data-success="' + attr(b.successMessage || 'Thank you — your place is reserved. We’ll be in touch with details.') + '"' +
+      ' style="background:var(--surface-card);border-radius:var(--radius-md);' +
+      'box-shadow:var(--shadow-card);padding:var(--space-8);max-width:640px;margin:0 auto">' +
+      (b.heading ? '<h3 style="font-size:var(--text-xl);margin-bottom:var(--space-6)">' + esc(b.heading) + '</h3>' : '') +
+      '<input type="hidden" name="event_id" value="' + attr(eventId) + '">' +
+      '<div class="wcaa-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">' +
+      formField('rsvp-name', 'Name', 'name', 'text', 'Your name', true) +
+      formField('rsvp-business', 'Business Name', 'business', 'text', 'Workroom or studio', false) +
+      formField('rsvp-email', 'Email', 'email', 'email', 'you@business.com', true) +
+      formField('rsvp-phone', 'Telephone #', 'phone', 'tel', '(555) 555-5555', false) +
+      formField('rsvp-guests', 'Guests joining you', 'guests', 'number', '0', false, ' min="0" max="10" value="0"') +
+      '</div>' +
+      '<div class="wcaa-field" style="margin-bottom:var(--space-6)">' +
+      '<label class="wcaa-field__label" for="rsvp-notes">Anything we should know?</label>' +
+      '<textarea class="wcaa-field__input" id="rsvp-notes" name="notes" rows="3" ' +
+      'placeholder="Dietary needs, accessibility, questions…" style="resize:vertical"></textarea></div>' +
+      turnstileWidget(site) +
+      '<button class="wcaa-btn wcaa-btn--primary wcaa-btn--lg wcaa-btn--full" type="submit">' +
+      esc(b.submitLabel || 'Reserve my place') + '</button>' +
+      '<p class="wcaa-form__msg" role="status" hidden></p>' +
+      '</form>'
+    );
+  },
+
+  group(b, site) {
     const mb = space(b.marginBottom, '');
     const gap = space(b.gap, '');
     return (
@@ -411,11 +477,11 @@ const BLOCKS = {
         gap ? 'gap:' + gap : '',
         mb ? 'margin-bottom:' + mb : '',
       ]) +
-      '>' + renderBlocks(b.blocks) + '</div>'
+      '>' + renderBlocks(b.blocks, site) + '</div>'
     );
   },
 
-  split(b) {
+  split(b, site) {
     const max = length(b.maxWidth, '');
     return (
       '<div class="wcaa-grid"' +
@@ -428,8 +494,8 @@ const BLOCKS = {
         b.centered ? 'margin:0 auto' : '',
       ]) +
       '>' +
-      '<div>' + renderBlocks(b.left) + '</div>' +
-      '<div>' + renderBlocks(b.right) + '</div>' +
+      '<div>' + renderBlocks(b.left, site) + '</div>' +
+      '<div>' + renderBlocks(b.right, site) + '</div>' +
       '</div>'
     );
   },
@@ -445,13 +511,13 @@ export const BLOCK_TYPES = Object.keys(BLOCKS);
    value through. pages.json is officer-editable, so an unrecognised type is
    either a typo or an injection attempt; both should be inert, and neither
    should take the whole page down. */
-export function renderBlocks(list) {
+export function renderBlocks(list, site) {
   if (!Array.isArray(list)) return '';
   return list
     .map((b) => {
       const fn = b && typeof b.type === 'string' && Object.prototype.hasOwnProperty.call(BLOCKS, b.type)
         ? BLOCKS[b.type] : null;
-      return fn ? fn(b) : '';
+      return fn ? fn(b, site) : '';
     })
     .filter(Boolean)
     .join('');
@@ -459,8 +525,8 @@ export function renderBlocks(list) {
 
 /* ---------- page chrome ---------- */
 
-function renderSection(s) {
-  const body = renderBlocks(s && s.blocks);
+function renderSection(s, site) {
+  const body = renderBlocks(s && s.blocks, site);
   if (!body) return '';
   const cls =
     'wcaa-sec' + (s.tint ? ' wcaa-sec--tint' : '') + (s.dark ? ' wcaa-sec--dark' : '') +
@@ -550,6 +616,7 @@ function renderFooter(site) {
 /* The whole document for one page. Deterministic: same inputs, same bytes —
    no timestamps, no random ids, no Date. tools/test-pages.mjs asserts it. */
 export function renderPage(page, site) {
+  const hasForm = pageHasForm(page);
   return (
     '<!DOCTYPE html>\n' +
     '<html lang="en">\n<head>\n' +
@@ -559,10 +626,18 @@ export function renderPage(page, site) {
     '<link rel="stylesheet" href="styles.css">\n' +
     '<link rel="stylesheet" href="css/components.css">\n' +
     '<link rel="stylesheet" href="css/pages.css">\n' +
+    /* Scripts ONLY on a page that carries a form. The content pages ship none,
+       and tools/test-pages.mjs asserts that per page rather than site-wide — the
+       Turnstile widget needs JavaScript, so a bot-gated form has no JS-free path,
+       but that is no reason for the other six pages to pay for it. */
+    (hasForm
+      ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>\n' +
+        '<script src="js/forms.js" defer></script>\n'
+      : '') +
     '</head>\n<body>\n' +
     renderNav(site, page.navHref) +
     renderHero(page.hero) +
-    (Array.isArray(page.sections) ? page.sections.map(renderSection).join('') : '') +
+    (Array.isArray(page.sections) ? page.sections.map((s) => renderSection(s, site)).join('') : '') +
     renderFooter(site) +
     '\n</body>\n</html>\n'
   );

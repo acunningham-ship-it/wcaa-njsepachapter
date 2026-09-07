@@ -65,12 +65,30 @@ const ok = (name, cond, detail) => {
 
     const block = CONTAINERS[type] ? CONTAINERS[type](base) : base;
     const html = renderBlocks([block]);
-    /* gallery and image default to no photo, which correctly renders nothing
-       until one is chosen — the editor's job, not the renderer's. */
-    const mayBeEmpty = type === 'gallery' || type === 'image';
+    /* Three blocks correctly render nothing until the officer supplies the one
+       thing only they can: a photo, or the id of an event they have opened for
+       registration. That is not the same as a broken default — an rsvpForm
+       pointing at no event would take sign-ups the endpoint then refuses, so
+       rendering nothing is the honest behaviour. The editor marks those fields
+       required, which is where the prompting belongs. */
+    const NEEDS_CONTENT = ['gallery', 'image', 'rsvpForm'];
+    const mayBeEmpty = NEEDS_CONTENT.includes(type);
     ok(`the default ${type} renders visible markup`, mayBeEmpty || html.length > 0, { type, html: html.slice(0, 80) });
     ok(`the default ${type} renders no raw < from its own content`,
        !/<[^>]*<script/i.test(html));
+  }
+}
+
+/* ---------- the exempt blocks render once given their one required thing ---------- */
+{
+  const filled = {
+    gallery: { ...BLOCK_DEFAULTS.gallery(), items: [{ src: 'uploads/site/x.webp', alt: 'A photo' }] },
+    image: { ...BLOCK_DEFAULTS.image(), src: 'uploads/site/x.webp', alt: 'A photo' },
+    rsvpForm: { ...BLOCK_DEFAULTS.rsvpForm(), eventId: 'jun-18' },
+  };
+  for (const [type, block] of Object.entries(filled)) {
+    const html = renderBlocks([block], {});
+    ok(`${type} DOES render once its required field is set`, html.length > 0, { type, html: html.slice(0, 60) });
   }
 }
 

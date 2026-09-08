@@ -47,6 +47,14 @@ export async function onRequest(context) {
   });
   if (!v.ok) return json({ ok: false, error: v.error }, 400);
 
+  /* The id is a join key, not prose: the public sign-up form (js/blocks.js) and
+     the delete endpoint both accept only ^[A-Za-z0-9_-]{1,64}$ and reject anything
+     else. Enforce that SAME shape here so we can't mint an id (a space, an accent)
+     that no form can reference and no admin can remove — a zombie row. */
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(v.values.id)) {
+    return json({ ok: false, error: 'Event id can use only letters, numbers, hyphens and underscores (no spaces).' }, 400);
+  }
+
   /* Capacity is optional and NULL means unlimited, so an absent field and a zero
      are different things and must not collapse into each other. */
   let capacity = null;

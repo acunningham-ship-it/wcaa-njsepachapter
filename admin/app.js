@@ -546,11 +546,24 @@ function eventCard(ev) {
   const box = el('div', { className: 'ev-rsvps', hidden: true });
   const view = el('button', { className: 'ev-btn', type: 'button', textContent: `Sign-ups (${seats})` });
   view.addEventListener('click', () => { box.hidden = !box.hidden; if (!box.hidden) loadRsvps(ev, box); });
+  // Delete only an empty event — the server refuses otherwise (rsvps cascade), so
+  // the button mirrors that: disabled while anyone is signed up.
+  const del = el('button', { className: 'ev-btn ev-btn--danger', type: 'button', textContent: 'Delete' });
+  if (seats > 0) { del.disabled = true; del.title = 'Remove the sign-ups first.'; }
+  del.addEventListener('click', async () => {
+    if (!confirm(`Delete “${ev.title}”? This can’t be undone.`)) return;
+    del.disabled = true;
+    let res;
+    try { res = await fetch('../api/events/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id }) }).then((x) => x.json()); }
+    catch { res = { ok: false, error: 'Network error.' }; }
+    if (!res.ok) { del.disabled = false; alert(res.error || 'Couldn’t delete that event.'); return; }
+    loadEvents();
+  });
   return el('div', { className: 'ev-card' }, [
     el('div', { className: 'ev-card-head' }, [
       el('div', { className: 'ev-card-title' }, [el('span', { className: 'ev-name', textContent: ev.title }), el('code', { className: 'ev-id', textContent: ev.id })]),
       badge, count,
-      el('div', { className: 'ev-actions' }, [view, toggle]),
+      el('div', { className: 'ev-actions' }, [view, toggle, del]),
     ]),
     box,
   ]);

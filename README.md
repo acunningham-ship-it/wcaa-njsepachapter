@@ -1,6 +1,11 @@
 # WCAA New Jersey & Southeastern Pennsylvania Chapter — website
 
-Live: https://acunningham-ship-it.github.io/wcaa-njsepachapter/
+Live: https://wcaa-njsepachapter.com/
+
+(The `acunningham-ship-it.github.io/wcaa-njsepachapter/` address is an OLD GitHub Pages
+mirror of the same `master` branch. It still serves, so it is not 404ed — board members may
+have it bookmarked — but every page now redirects it to the canonical domain above. Hand out
+the .com; the mirror URL contains a personal name and confused the board.)
 Deploys from the **`master`** branch, root directory, via GitHub Pages.
 
 ## How to change the site

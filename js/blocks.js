@@ -221,12 +221,19 @@ const BLOCKS = {
             '</div>'
           );
         }
+        /* The icon circle renders only when there IS an icon. An icon-marker card
+           with no icon (e.g. a vendor perk that's just a name + a discount) would
+           otherwise show an empty blue circle — a broken-looking decorative slot.
+           No icon = just the title and text, centered. */
+        const cardIcon = iconTag(it.icon, 24);
         return (
           '<div style="background:var(--surface-card);border-radius:var(--radius-md);box-shadow:var(--shadow-card);' +
           'padding:var(--space-8) var(--space-6);text-align:center">' +
-          '<div style="width:56px;height:56px;border-radius:var(--radius-round);background:var(--blue-100);' +
-          'color:var(--blue-700);display:flex;align-items:center;justify-content:center;margin:0 auto var(--space-4)">' +
-          iconTag(it.icon, 24) + '</div>' +
+          (cardIcon
+            ? '<div style="width:56px;height:56px;border-radius:var(--radius-round);background:var(--blue-100);' +
+              'color:var(--blue-700);display:flex;align-items:center;justify-content:center;margin:0 auto var(--space-4)">' +
+              cardIcon + '</div>'
+            : '') +
           '<h3 style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-heading);' +
           'margin:0 0 var(--space-2)">' + esc(it.title) + '</h3>' +
           '<p style="font-size:15px;line-height:1.55;color:var(--text-muted);margin:0">' + esc(it.text) + '</p>' +
@@ -483,6 +490,18 @@ const BLOCKS = {
 
   split(b, site) {
     const max = length(b.maxWidth, '');
+    const left = renderBlocks(b.left, site);
+    const right = renderBlocks(b.right, site);
+    /* A column that renders to nothing — e.g. an events list with no events posted
+       yet — would leave a dead half of the grid and a lopsided two-up. Collapse to
+       the populated column at full width instead; the grid only appears once both
+       sides have content. */
+    if (!left || !right) {
+      const only = left || right;
+      return only
+        ? '<div' + styleAttr([max ? 'max-width:' + max : '', b.centered ? 'margin:0 auto' : '']) + '>' + only + '</div>'
+        : '';
+    }
     return (
       '<div class="wcaa-grid"' +
       styleAttr([
@@ -494,8 +513,8 @@ const BLOCKS = {
         b.centered ? 'margin:0 auto' : '',
       ]) +
       '>' +
-      '<div>' + renderBlocks(b.left, site) + '</div>' +
-      '<div>' + renderBlocks(b.right, site) + '</div>' +
+      '<div>' + left + '</div>' +
+      '<div>' + right + '</div>' +
       '</div>'
     );
   },

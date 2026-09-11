@@ -19,7 +19,7 @@
             "size": "lg"
           },
           {
-            "label": "Upcoming Events",
+            "label": "Chapter Events",
             "href": "events.html",
             "variant": "onDark",
             "size": "lg"
@@ -82,46 +82,29 @@
                 {
                   "type": "heading",
                   "align": "left",
-                  "kicker": "Around the Chapter",
-                  "title": "Recent Events",
-                  "lede": "We meet monthly — typically a Thursday morning — announced via email, Facebook, and Instagram.",
-                  "flush": true
+                  "kicker": "What's Next",
+                  "title": "Upcoming Events",
+                  "lede": "Chapter meetings are announced by email, on Facebook, and on Instagram — the next one will appear here as soon as it's scheduled.",
+                  "marginBottom": "var(--space-6)"
+                },
+                {
+                  "type": "buttons",
+                  "layout": "plain",
+                  "items": [
+                    {
+                      "label": "All Chapter Events",
+                      "href": "events.html",
+                      "variant": "outline",
+                      "size": "sm"
+                    }
+                  ]
                 }
               ],
               "right": [
                 {
-                  "type": "group",
+                  "type": "events",
                   "gap": "var(--space-4)",
-                  "blocks": [
-                    {
-                      "type": "events",
-                      "gap": "var(--space-4)",
-                      "items": [
-                        {
-                          "month": "Jun",
-                          "day": "18",
-                          "badge": "Zoom",
-                          "title": "Centurion Roman Shade: Elevated Designs",
-                          "time": "9:30 AM ET",
-                          "location": "Zoom",
-                          "description": "Elevated Roman shade techniques — relaxed and hobbled styles, top-down/bottom-up functionality, and more.",
-                          "href": "events.html"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "buttons",
-                      "layout": "plain",
-                      "items": [
-                        {
-                          "label": "All Chapter Events",
-                          "href": "events.html",
-                          "variant": "outline",
-                          "size": "sm"
-                        }
-                      ]
-                    }
-                  ]
+                  "items": []
                 }
               ]
             }
@@ -646,6 +629,22 @@
           ]
         },
         {
+          "blocks": [
+            {
+              "type": "heading",
+              "kicker": "Member Benefits",
+              "title": "Perks",
+              "lede": "Membership comes with exclusive discounts from our partner vendors. We're adding them here — check back soon."
+            },
+            {
+              "type": "cards",
+              "marker": "icon",
+              "columns": 3,
+              "items": []
+            }
+          ]
+        },
+        {
           "tint": true,
           "tight": true,
           "blocks": [
@@ -661,7 +660,7 @@
                   "text": "Become (or confirm you are) a member of the Window Coverings Association of America — it's the prerequisite for every local chapter.",
                   "action": {
                     "label": "WCAA National",
-                    "href": "https://www.wcaa.org/",
+                    "href": "https://www.wcaa.org/membership",
                     "variant": "outline",
                     "iconAfter": "assets/icons/external-link.svg",
                     "iconSize": 14

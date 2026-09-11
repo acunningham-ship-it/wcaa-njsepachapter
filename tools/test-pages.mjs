@@ -208,7 +208,7 @@ const content = JSON.parse(read('content/pages.json'));
 
   has('index.html', 'A Community of Window Covering Professionals');
   has('index.html', 'Monthly Programs');
-  has('index.html', 'Centurion Roman Shade: Elevated Designs');
+  has('index.html', 'will appear here as soon as');   // the Upcoming Events section lede (home)
   has('index.html', 'uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_0.webp');
   has('index.html', 'Take your business to new heights');
   has('about.html', 'Mission Statement');

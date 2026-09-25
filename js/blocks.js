@@ -473,7 +473,7 @@ const BLOCKS = {
     );
   },
 
-  group(b, site) {
+  group(b, site, ed) {
     const mb = space(b.marginBottom, '');
     const gap = space(b.gap, '');
     return (
@@ -484,14 +484,14 @@ const BLOCKS = {
         gap ? 'gap:' + gap : '',
         mb ? 'margin-bottom:' + mb : '',
       ]) +
-      '>' + renderBlocks(b.blocks, site) + '</div>'
+      '>' + renderBlocks(b.blocks, site, ed && ed.into('blocks')) + '</div>'
     );
   },
 
-  split(b, site) {
+  split(b, site, ed) {
     const max = length(b.maxWidth, '');
-    const left = renderBlocks(b.left, site);
-    const right = renderBlocks(b.right, site);
+    const left = renderBlocks(b.left, site, ed && ed.into('left'));
+    const right = renderBlocks(b.right, site, ed && ed.into('right'));
     /* A column that renders to nothing — e.g. an events list with no events posted
        yet — would leave a dead half of the grid and a lopsided two-up. Collapse to
        the populated column at full width instead; the grid only appears once both
@@ -530,22 +530,51 @@ export const BLOCK_TYPES = Object.keys(BLOCKS);
    value through. pages.json is officer-editable, so an unrecognised type is
    either a typo or an injection attempt; both should be inert, and neither
    should take the whole page down. */
-export function renderBlocks(list, site) {
+export function renderBlocks(list, site, ed) {
   if (!Array.isArray(list)) return '';
   return list
-    .map((b) => {
+    .map((b, i) => {
       const fn = b && typeof b.type === 'string' && Object.prototype.hasOwnProperty.call(BLOCKS, b.type)
         ? BLOCKS[b.type] : null;
-      return fn ? fn(b, site) : '';
+      if (!ed) return fn ? fn(b, site) : '';
+      return editWrap(ed.at(i), fn ? fn(b, site, ed.child(i)) : '', b);
     })
     .filter(Boolean)
     .join('');
 }
 
+/* ---------- editor mode (admin preview ONLY) ----------
+   renderPage(page, site, { edit: true }) tags every block with the path the admin uses to
+   address it, and gives an EMPTY block a visible stand-in. Without `edit` none of this runs:
+   published pages are byte-identical (build-pages --check and test-pages assert it).
+   ⛔ Why the stand-in matters: an events or cards block with no items renders nothing, so an
+   officer looking at the preview had nothing to click where "Upcoming Events" should be — and
+   the first officer save turned the neighbouring button into a new events block instead. */
+const EMPTY_TEXT = {
+  events: 'No events listed yet', cards: 'No cards yet', gallery: 'No photos yet',
+  officers: 'No officers listed yet', list: 'No points yet', buttons: 'No buttons yet', image: 'No photo chosen yet',
+};
+
+function editor(section, chain) {
+  return {
+    at: (i) => ({ section, chain: chain.concat([{ index: i, key: 'blocks' }]) }),
+    // Where block i's own children live: a group's list, or one side of a split.
+    child: (i) => ({ into: (key) => editor(section, chain.concat([{ index: i, key }])) }),
+  };
+}
+
+function editWrap(path, html, b) {
+  const tag = ' data-edit="' + attr(JSON.stringify(path)) + '" data-edit-type="' + attr(b && b.type) + '"';
+  if (html) return '<div' + tag + ' style="display:contents">' + html + '</div>';
+  return '<div' + tag + ' class="wcaa-edit-empty" style="border:2px dashed var(--gold-300,#d9b86c);' +
+    'border-radius:8px;padding:18px;text-align:center;color:var(--text-muted,#666);font:15px/1.4 sans-serif">' +
+    esc(EMPTY_TEXT[b && b.type] || 'This block is empty') + ' — click here to add some</div>';
+}
+
 /* ---------- page chrome ---------- */
 
-function renderSection(s, site) {
-  const body = renderBlocks(s && s.blocks, site);
+function renderSection(s, site, ed) {
+  const body = renderBlocks(s && s.blocks, site, ed);
   if (!body) return '';
   const cls =
     'wcaa-sec' + (s.tint ? ' wcaa-sec--tint' : '') + (s.dark ? ' wcaa-sec--dark' : '') +
@@ -666,7 +695,8 @@ export const CANONICAL_REDIRECT = [
 
 /* The whole document for one page. Deterministic: same inputs, same bytes —
    no timestamps, no random ids, no Date. tools/test-pages.mjs asserts it. */
-export function renderPage(page, site) {
+export function renderPage(page, site, opts) {
+  const edit = !!(opts && opts.edit);
   const hasForm = pageHasForm(page);
   return (
     '<!DOCTYPE html>\n' +
@@ -689,7 +719,8 @@ export function renderPage(page, site) {
     '</head>\n<body>\n' +
     renderNav(site, page.navHref) +
     renderHero(page.hero) +
-    (Array.isArray(page.sections) ? page.sections.map((s) => renderSection(s, site)).join('') : '') +
+    (Array.isArray(page.sections)
+      ? page.sections.map((s, i) => renderSection(s, site, edit ? editor(i, []) : null)).join('') : '') +
     renderFooter(site) +
     '\n</body>\n</html>\n'
   );

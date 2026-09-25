@@ -95,6 +95,19 @@ function checkStrings(value, path, out) {
   return err(path, 'is not a value we can store (only text, numbers, true/false and lists).');
 }
 
+/* The sample text admin/fields.js BLOCK_DEFAULTS seeds a new block with. It exists so a new
+   block renders something in the preview — never so it ships: the first officer save (1feb57e)
+   published a "Jan 1 / New event" card to the live homepage. [field, sample] per type, checked
+   on the block itself and on each of its items. */
+const SAMPLES = {
+  heading: ['title', 'New heading'],
+  text: ['text', 'New paragraph.'],
+  buttons: ['label', 'Button'],
+  cards: ['title', 'Card'],
+  events: ['title', 'New event'],
+  officers: ['name', 'Name'],
+};
+
 function checkBlocks(blocks, path, depth) {
   if (!Array.isArray(blocks)) return err(path, 'must be a list of blocks.');
   if (blocks.length > LIMITS.blocks) return err(path, `has more than ${LIMITS.blocks} blocks.`);
@@ -105,6 +118,16 @@ function checkBlocks(blocks, path, depth) {
     if (typeof b.type !== 'string' || !b.type) return err(p + '.type', 'is missing.');
     if (BLOCK_TYPES.indexOf(b.type) === -1) {
       return err(p + '.type', `is not a block type we know. Try one of: ${BLOCK_TYPES.join(', ')}.`);
+    }
+    const sample = Object.prototype.hasOwnProperty.call(SAMPLES, b.type) ? SAMPLES[b.type] : null;
+    if (sample) {
+      const [key, text] = sample;
+      const hit = [b].concat(Array.isArray(b.items) ? b.items : [])
+        .findIndex((o) => o && typeof o[key] === 'string' && o[key].trim() === text);
+      if (hit !== -1) {
+        return err(hit ? `${p}.items[${hit - 1}]` : p,
+          `still says “${text}” (the sample text). Type the real wording, or remove it.`);
+      }
     }
     if (b.type === 'group' || b.type === 'split') {
       if (depth >= LIMITS.depth) return err(p, `is nested more than ${LIMITS.depth} levels deep.`);
@@ -181,4 +204,16 @@ export function validateContent(doc) {
   if (badText) return badText;
 
   return { ok: true, pages: doc.pages.length, bytes: size };
+}
+
+/* A fingerprint of the content an officer's editor started from. The admin sends it with a
+   save; /api/save refuses (409) when the repo's current content no longer matches — i.e.
+   someone else saved, or a developer pushed, since this editor loaded. Without it the save
+   silently re-commits the officer's stale copy over the newer content (the branch-race check
+   in ghCommitFiles can't see that: it builds on the fresh head, but with old file contents).
+   Parsed-then-stringified, so whitespace/reformatting never counts as a change. */
+export async function contentFingerprint(content, site) {
+  const bytes = new TextEncoder().encode(JSON.stringify({ content, site }));
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
 }

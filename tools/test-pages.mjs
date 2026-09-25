@@ -407,5 +407,40 @@ const content = JSON.parse(read('content/pages.json'));
      }), pages['join.html'].match(/<a [^>]*wcaa-btn--full[^>]*>/g));
 }
 
+/* ---------- editor mode (admin preview click-to-edit) ----------
+   Every data-edit path must resolve — with the SAME walk admin/app.js uses (containerAt/
+   blockAt) — to a block of the advertised type, or a click on the page opens the wrong form.
+   And without { edit: true } there must be no trace of it: published bytes can't change. */
+{
+  const resolve = (page, path) => {
+    let list = page.sections[path.section].blocks;
+    for (const step of path.chain.slice(0, -1)) list = list[step.index][step.key];
+    return list[path.chain[path.chain.length - 1].index];
+  };
+  const unesc = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  let tagged = 0, nested = 0, wrong = [];
+  for (const page of content.pages) {
+    const html = renderPage(page, site, { edit: true });
+    for (const m of html.matchAll(/data-edit="([^"]+)" data-edit-type="([^"]*)"/g)) {
+      const path = JSON.parse(unesc(m[1]));
+      let block = null;
+      try { block = resolve(page, path); } catch { /* a path into nowhere: counted as wrong below */ }
+      tagged++;
+      if (path.chain.length > 1) nested++;
+      if (!block || block.type !== m[2]) wrong.push(page.slug + ' ' + m[1]);
+    }
+    ok(`${page.slug}: published render carries no editor markup`,
+       !/data-edit|wcaa-edit-empty/.test(renderPage(page, site)) && renderPage(page, site) === renderPage(page, site, { edit: false }));
+  }
+  const blockCount = (bs) => (bs || []).reduce((n, b) => n + 1 + blockCount(b.blocks) + blockCount(b.left) + blockCount(b.right), 0);
+  const total = content.pages.reduce((n, p) => n + (p.sections || []).reduce((m, s) => m + blockCount(s.blocks), 0), 0);
+  ok(`every block on every page is clickable (${tagged}/${total})`, tagged === total, { tagged, total });
+  ok('...including blocks nested in groups and split columns', nested > 0, { nested });
+  ok('every click path resolves to the block it claims to be', wrong.length === 0, wrong.slice(0, 3));
+  const home = renderPage(content.pages.find((p) => p.slug === 'index'), site, { edit: true });
+  ok('an EMPTY events block gets a visible, clickable stand-in in the editor',
+     /data-edit-type="events" class="wcaa-edit-empty"[^>]*>No events listed yet/.test(home));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

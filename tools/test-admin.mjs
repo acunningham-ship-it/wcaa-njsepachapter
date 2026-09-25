@@ -92,19 +92,19 @@ const ok = (name, cond, detail) => {
   }
 }
 
-/* ---------- a page built only from defaults is valid and saveable ---------- */
+/* ---------- a page built only from defaults is valid once the sample text is replaced ----------
+   Defaults are structurally valid, but their sample wording ("New event", "Card"…) must never
+   ship — 1feb57e published a "Jan 1 / New event" card to the live homepage. So: fresh defaults
+   are REFUSED for exactly that reason, and the same page with the samples reworded validates. */
 {
-  const doc = {
-    pages: [{
-      slug: 'index',
-      navHref: 'index.html',
-      title: 'Everything',
-      hero: { variant: 'page', title: 'Everything' },
-      sections: [{ blocks: BLOCK_TYPES.map((t) => BLOCK_DEFAULTS[t]()) }],
-    }],
-  };
-  const v = validateContent(doc);
-  ok('a page containing one of every default block validates', v.ok === true, v);
+  const fresh = { pages: [{ slug: 'index', navHref: 'index.html', title: 'Everything',
+    hero: { variant: 'page', title: 'Everything' }, sections: [{ blocks: BLOCK_TYPES.map((t) => BLOCK_DEFAULTS[t]()) }] }] };
+  const rv = validateContent(fresh);
+  ok('fresh default blocks are refused for their sample text, and only that', rv.ok === false && /sample text/.test(rv.error), rv);
+  const reword = (o) => { for (const k of ['title', 'text', 'label', 'name']) if (typeof o[k] === 'string') o[k] = 'Real ' + k; };
+  for (const b of fresh.pages[0].sections[0].blocks) { reword(b); (Array.isArray(b.items) ? b.items : []).forEach((it) => it && typeof it === 'object' && reword(it)); }
+  const v = validateContent(fresh);
+  ok('...and the same page with real wording validates', v.ok === true, v);
 }
 
 /* ---------- iconRows text <-> spans ---------- */

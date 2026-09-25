@@ -19,7 +19,7 @@
    change". See ghCommitFiles in _lib.js. */
 import { json, requireSession, missingEnv, ghGetFile, ghCommitFiles } from './_lib.js';
 import { readBody } from './_input.js';
-import { validateContent } from '../../js/validate-content.js';
+import { validateContent, contentFingerprint } from '../../js/validate-content.js';
 import { renderSite } from '../../js/blocks.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
@@ -84,6 +84,20 @@ export async function onRequest(context) {
      failure people actually notice. */
   const previous = await ghGetFile(env, 'content/pages.json');
   if (!previous.ok) return json({ ok: false, error: 'Couldn’t read the current site. Please try again.' }, 502);
+
+  /* Stale-editor check: refuse when the branch's content is no longer what this editor started
+     from (see contentFingerprint). `base` absent = an admin page from before this check existed;
+     let it through rather than lock that officer out mid-edit. */
+  if (typeof body.base === 'string') {
+    const prevSite = await ghGetFile(env, 'content/site.json');
+    if (!prevSite.ok) return json({ ok: false, error: 'Couldn’t read the current site. Please try again.' }, 502);
+    let current = null;
+    try { current = await contentFingerprint(JSON.parse(previous.content), JSON.parse(prevSite.content)); } catch {}
+    if (current !== body.base) {
+      return json({ ok: false, stale: true,
+        error: 'The site was changed since you opened the editor (someone else saved, or an update was published). Reload the page to get the latest, then make your change again.' }, 409);
+    }
+  }
   const removed = [];
   if (previous.content) {
     try {
@@ -121,6 +135,7 @@ export async function onRequest(context) {
   return json({
     ok: true,
     commit: result.commit,
+    base: await contentFingerprint(content, site),
     pages: names.length,
     removed,
     note: 'Saved. The live site updates in about a minute.',

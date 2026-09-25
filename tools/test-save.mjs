@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { validateContent } from '../js/validate-content.js';
+import { validateContent, contentFingerprint } from '../js/validate-content.js';
 import { BLOCK_TYPES } from '../js/blocks.js';
 import { signToken, makeSessionCookie } from '../functions/api/_lib.js';
 import { onRequest as save } from '../functions/api/save.js';
@@ -107,6 +107,7 @@ const resetGH = (previousContent) => {
     refPatches: 0,
     refStatus: 200,
     previous: previousContent,
+    previousSite: read('content/site.json'),
     blobBySha: {},
     blobContent: {},
   };
@@ -125,6 +126,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (gh.previous === null) return send({}, 404);
     return send({ content: b64(gh.previous), sha: 'oldsha' });
   }
+  if (/\/contents\/content\/site\.json/.test(u)) return send({ content: b64(gh.previousSite), sha: 'oldsite' });
   if (/\/git\/ref\/heads\//.test(u)) return send({ object: { sha: 'HEADSHA' } });
   if (/\/git\/commits\/HEADSHA/.test(u)) return send({ tree: { sha: 'BASETREE' } });
   if (/\/git\/blobs$/.test(u)) {
@@ -183,6 +185,40 @@ const callSave = async (payload, { cookie = COOKIE, env = ENV } = {}) => {
   r = await callSave({ content: REAL_CONTENT, site: { brandMark: 'WCAA' } });
   ok('save refuses incomplete site settings', r.status === 400, r.json);
   ok('  ...and committed NOTHING', gh.commits === 0);
+}
+
+/* ================= save: the stale-editor check =================
+   An officer's tab loaded content at T0; someone saved (or a developer pushed) at T1; the
+   officer saves at T2. ghCommitFiles builds on the fresh head, so without this check the T0
+   copy silently overwrites T1. `base` = fingerprint of what the editor loaded. */
+{
+  const base = await contentFingerprint(REAL_CONTENT, REAL_SITE);
+
+  resetGH(read('content/pages.json'));
+  let r = await callSave({ content: REAL_CONTENT, site: REAL_SITE, base });
+  ok('stale check: an up-to-date editor saves', r.status === 200, r.json);
+  ok('  ...and gets back the fingerprint of what it just saved (so its NEXT save passes)',
+     r.json?.base === await contentFingerprint(REAL_CONTENT, REAL_SITE), r.json);
+
+  const newer = clone(REAL_CONTENT);
+  newer.pages[0].title = 'Changed by someone else';
+  resetGH(JSON.stringify(newer, null, 2));
+  r = await callSave({ content: REAL_CONTENT, site: REAL_SITE, base });
+  ok('stale check: refuses when the branch content moved since the editor loaded', r.status === 409 && r.json?.stale === true, r.json);
+  ok('  ...and committed NOTHING', gh.commits === 0 && gh.refPatches === 0, gh.calls);
+
+  resetGH(read('content/pages.json'));
+  gh.previousSite = JSON.stringify({ ...REAL_SITE, copyright: 'someone edited site.json' });
+  r = await callSave({ content: REAL_CONTENT, site: REAL_SITE, base });
+  ok('stale check: a site.json change counts too', r.status === 409, r.json);
+
+  resetGH(JSON.stringify(REAL_CONTENT));   // same content, different whitespace
+  r = await callSave({ content: REAL_CONTENT, site: REAL_SITE, base });
+  ok('stale check: a pure reformat is NOT a change', r.status === 200, r.json);
+
+  resetGH(JSON.stringify(newer, null, 2));
+  r = await callSave({ content: REAL_CONTENT, site: REAL_SITE });
+  ok('stale check: an old admin page that sends no base still saves (compat)', r.status === 200, r.json);
 }
 
 /* ================= save: the happy path ================= */

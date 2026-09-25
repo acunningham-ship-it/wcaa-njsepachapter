@@ -638,6 +638,32 @@ function renderFooter(site) {
   );
 }
 
+/* The github.io -> .com canonical redirect, emitted into EVERY page's <head>.
+   It lives HERE, in the renderer, because it used to be hand-injected into the built HTML —
+   and the admin's save re-renders every page, so the first officer save (1feb57e, 09-14)
+   silently stripped it from all seven. Inline (not js/*.js) so it still resolves on a
+   mirror 404 at any depth. Hostname-guarded: see canonical-redirect.test.mjs. */
+export const CANONICAL_REDIRECT = [
+  "<!-- canonical-redirect: the github.io mirror serves the SAME master branch as the .com",
+  "     (GitHub Pages + Cloudflare Pages, one source). A plain redirect in this file would run on",
+  "     BOTH and loop the .com onto itself, so it is guarded by hostname and can only ever fire on",
+  "     the mirror. Path-mapped because the mirror serves under /wcaa-njsepachapter/ while the .com",
+  "     serves at root — redirecting to the bare domain would dump every deep link on the homepage. -->",
+  "<script>",
+  "(function(){",
+  "  var CANON = \"https://wcaa-njsepachapter.com\", MIRROR = \"acunningham-ship-it.github.io\", BASE = \"/wcaa-njsepachapter\";",
+  "  function target(host, path, search, hash){",
+  "    if (host !== MIRROR) return null;",
+  "    path = path.replace(new RegExp(\"^\" + BASE + \"(?=/|$)\"), \"\") || \"/\";",
+  "    return CANON + path + (search || \"\") + (hash || \"\");",
+  "  }",
+  "  if (typeof window !== \"undefined\") window.__wcaaRedirectTarget = target;",
+  "  var t = (typeof location !== \"undefined\") && target(location.hostname, location.pathname, location.search, location.hash);",
+  "  if (t) location.replace(t);",
+  "})();",
+  "</script>",
+].join('\n') + '\n';
+
 /* The whole document for one page. Deterministic: same inputs, same bytes —
    no timestamps, no random ids, no Date. tools/test-pages.mjs asserts it. */
 export function renderPage(page, site) {
@@ -659,6 +685,7 @@ export function renderPage(page, site) {
       ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>\n' +
         '<script src="js/forms.js" defer></script>\n'
       : '') +
+    CANONICAL_REDIRECT +
     '</head>\n<body>\n' +
     renderNav(site, page.navHref) +
     renderHero(page.hero) +

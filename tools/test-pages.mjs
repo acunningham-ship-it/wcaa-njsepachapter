@@ -22,7 +22,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { renderSite, renderPage, renderBlocks } from '../js/blocks.js';
+import { renderSite, renderPage, renderBlocks, CANONICAL_REDIRECT } from '../js/blocks.js';
+
+/* The canonical redirect is the ONE inline script the renderer emits, on every page, by design
+   (see js/blocks.js). Script checks below run on the page MINUS that exact byte-string, so any
+   OTHER inline script — or a mutated redirect — still fails them. */
+const withoutCanon = (html) => html.replace(CANONICAL_REDIRECT, '');
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -142,7 +147,7 @@ const content = JSON.parse(read('content/pages.json'));
     socials: [{ label: XSS, href: BAD_URL, icon: BAD_SRC }],
     copyright: XSS,
   };
-  const html = renderSite(hostile, hostileSite)['xss.html'];
+  const html = withoutCanon(renderSite(hostile, hostileSite)['xss.html']);
 
   ok('hostile content still renders a page', typeof html === 'string' && html.length > 2000);
   /* This page carries forms, so it legitimately loads the two permitted scripts.
@@ -239,7 +244,11 @@ const content = JSON.parse(read('content/pages.json'));
     'https://challenges.cloudflare.com/turnstile/v0/api.js',
     'js/forms.js',
   ];
-  for (const [name, html] of Object.entries(p)) {
+  for (const [name, full] of Object.entries(p)) {
+    const head = full.slice(0, full.indexOf('</head>'));
+    ok(`${name} carries the canonical redirect exactly once, in <head>`,
+       full.split(CANONICAL_REDIRECT).length === 2 && head.includes(CANONICAL_REDIRECT));
+    const html = withoutCanon(full);
     const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
     const hasForm = /<form\b/i.test(html);
     ok(`${name} has no inline script and no event-handler attributes`,

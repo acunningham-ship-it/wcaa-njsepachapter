@@ -66,6 +66,23 @@ for (const p of PAGES) {
   check(`${p} has it inside <head>`, s.indexOf("__wcaaRedirectTarget") < s.indexOf("</head>"));
 }
 
+/* ⛔ C only proves the COMMITTED bytes. The first officer save (1feb57e, 2026-09-14) re-rendered
+   every page and stripped the then hand-injected snippet from all seven while C would still have
+   passed on the old checkout. So also render FRESH from content — exactly what /api/save does —
+   and require the same snippet in every page. Fails if the renderer ever stops emitting it. */
+console.log("\nC2. a fresh render (what an admin save commits) still carries it");
+{
+  const { renderSite } = await import("./js/blocks.js");
+  const read = (f) => JSON.parse(readFileSync(new URL(`./content/${f}`, import.meta.url), "utf8"));
+  const fresh = renderSite(read("pages.json"), read("site.json"));
+  check("fresh render covers every page", PAGES.every((p) => p in fresh), Object.keys(fresh).join(","));
+  for (const p of PAGES) {
+    const s = fresh[p] || "";
+    check(`fresh ${p} carries the exact tested snippet in <head>`,
+      s.includes(m[0]) && s.indexOf(m[0]) < s.indexOf("</head>"));
+  }
+}
+
 console.log("\nD. the README no longer advertises the mirror as the live address");
 const readme = readFileSync(new URL("./README.md", import.meta.url), "utf8");
 const liveLine = readme.split("\n").find((l) => /^Live:/i.test(l.trim())) || "";

@@ -88,12 +88,14 @@
                   "marginBottom": "var(--space-6)"
                 },
                 {
-                  "type": "events",
+                  "type": "buttons",
+                  "layout": "plain",
                   "items": [
                     {
-                      "month": "Jan",
-                      "day": "1",
-                      "title": "New event"
+                      "label": "All Chapter Events",
+                      "href": "events.html",
+                      "variant": "outline",
+                      "size": "sm"
                     }
                   ]
                 }

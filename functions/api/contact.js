@@ -13,6 +13,7 @@
 import { json } from './_lib.js';
 import { readBody, validate, text, multiline, email as emailField, phone as phoneField } from './_input.js';
 import { verifyTurnstile } from './_turnstile.js';
+import { honeypotFilled, rateLimited, RATE_LIMIT_MESSAGE } from './_guard.js';
 
 const GENERIC = 'Something went wrong sending your message. Please try again, or call the chapter directly.';
 
@@ -23,6 +24,9 @@ export async function onRequest(context) {
 
   const body = await readBody(request);
   if (!body) return json({ ok: false, error: 'We couldn’t read that form. Please try again.' }, 400);
+
+  if (honeypotFilled(body)) return json({ ok: true });   // see _guard.js
+  if (await rateLimited(env, request, 'contact')) return json({ ok: false, error: RATE_LIMIT_MESSAGE }, 429);
 
   const gate = await verifyTurnstile(env, body['cf-turnstile-response'], request);
   if (!gate.ok) return json({ ok: false, error: gate.error }, gate.status);

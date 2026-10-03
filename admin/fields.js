@@ -60,14 +60,20 @@ export const FIELDS = {
   events: [
     { key: 'gap', kind: 'select', label: 'Space between', options: SPACING },
     { key: 'items', kind: 'items', label: 'Events', fields: [
-      { key: 'month', kind: 'text', label: 'Month', hint: 'Jun' },
-      { key: 'day', kind: 'text', label: 'Day', hint: '18' },
-      { key: 'title', kind: 'text', label: 'Event title' },
-      { key: 'badge', kind: 'text', label: 'Tag', hint: 'Zoom, In Person…' },
+      { key: 'month', kind: 'text', label: 'Month', hint: 'For example: Oct' },
+      { key: 'day', kind: 'text', label: 'Day', hint: 'For example: 14' },
+      { key: 'title', kind: 'text', label: 'Event name' },
+      { key: 'badge', kind: 'text', label: 'Tag', hint: 'For example: Zoom, In Person' },
       { key: 'time', kind: 'text', label: 'Time' },
-      { key: 'location', kind: 'text', label: 'Location' },
+      { key: 'location', kind: 'text', label: 'Place' },
       { key: 'description', kind: 'long', label: 'Description' },
-      { key: 'href', kind: 'link', label: 'Links to' },
+      { key: 'href', kind: 'link', label: 'More details link', hint: 'Optional. Leave empty if there isn’t one.' },
+      { key: 'register', kind: 'check', label: 'Let people register on the website',
+        hint: 'Adds a “Register for this event” button. You’ll see who registered under Event sign-ups.' },
+      { key: 'meetingLink', kind: 'text', label: 'Meeting link (Zoom, Google Meet or Teams)',
+        hint: 'Paste the whole link. People who register get a “Join the meeting” button.' },
+      { key: 'meetingPublic', kind: 'check', label: 'Show the meeting link to everyone',
+        hint: 'Puts a “Join the meeting” button on the event itself, for anyone visiting the site.' },
     ] },
   ],
   gallery: [
@@ -114,13 +120,6 @@ export const FIELDS = {
     { key: 'submitLabel', kind: 'text', label: 'Button text' },
     { key: 'note', kind: 'long', label: 'Small print' },
   ],
-  rsvpForm: [
-    { key: 'eventId', kind: 'text', label: 'Event id', required: true,
-      hint: 'Must match an event you have opened for registration' },
-    { key: 'heading', kind: 'text', label: 'Form heading' },
-    { key: 'submitLabel', kind: 'text', label: 'Button text' },
-    { key: 'successMessage', kind: 'long', label: 'Message after they register' },
-  ],
   group: [
     { key: 'gap', kind: 'select', label: 'Space between blocks', options: SPACING },
     { key: 'marginBottom', kind: 'select', label: 'Space below', options: SPACING },
@@ -132,6 +131,20 @@ export const FIELDS = {
     { key: 'maxWidth', kind: 'text', label: 'Max width', hint: 'e.g. 1000px' },
   ],
 };
+
+/* The big banner at the top of each page. Not a block, so it has its own short list. */
+export const HERO_FIELDS = [
+  { key: 'kicker', kind: 'text', label: 'Small line above the title' },
+  { key: 'title', kind: 'text', label: 'Page title', required: true },
+  { key: 'subtitle', kind: 'long', label: 'Line under the title' },
+  { key: 'image', kind: 'image', label: 'Background photo' },
+  { key: 'actions', kind: 'items', label: 'Buttons', fields: BUTTON_ITEM },
+];
+
+/* Settings about LAYOUT rather than words. The editor tucks these under "More settings" so the
+   first thing an officer sees when they open something is what it says, not how it's spaced. */
+export const ADVANCED_KEYS = ['align', 'size', 'onDark', 'marginBottom', 'marginTop', 'muted', 'prose', 'layout',
+  'columns', 'gap', 'aspect', 'maxWidth', 'marker', 'variant', 'fullWidth'];
 
 /* What each block is CALLED in the editor, and a one-line description. Officers
    do not think in "iconRows" — and a label that reads like a developer's variable
@@ -148,7 +161,6 @@ export const BLOCK_LABELS = {
   officers:    ['Officers',       'Chapter officers with contact details'],
   iconRows:    ['Icon rows',      'Lines of text, each with an icon'],
   contactForm: ['Contact form',   'The form that sends the chapter a message'],
-  rsvpForm:    ['Event sign-up',  'Lets people register for one event'],
   group:       ['Group',          'Holds other blocks together'],
   split:       ['Two columns',    'Two columns, each holding its own blocks'],
 };
@@ -170,10 +182,6 @@ export const BLOCK_DEFAULTS = {
   iconRows:    () => ({ type: 'iconRows', layout: 'stack',
                         items: [{ icon: 'assets/icons/mail.svg', lines: [[{ text: 'Text' }]] }] }),
   contactForm: () => ({ type: 'contactForm', heading: 'Get in touch', submitLabel: 'Send' }),
-  /* No event id by default: the block renders nothing until one is set, which is
-     right — a sign-up form pointing at no event would take registrations the
-     endpoint then refuses. The editor's required marker is what prompts for it. */
-  rsvpForm:    () => ({ type: 'rsvpForm', heading: 'Reserve your place', submitLabel: 'Reserve my place' }),
   group:       () => ({ type: 'group', blocks: [] }),
   split:       () => ({ type: 'split', columns: '1fr 1fr', left: [], right: [] }),
 };

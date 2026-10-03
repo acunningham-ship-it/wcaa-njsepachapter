@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { renderSite, renderPage, renderBlocks, CANONICAL_REDIRECT } from '../js/blocks.js';
+import { renderSite, renderPage, renderBlocks, renderRegisterPage, CANONICAL_REDIRECT } from '../js/blocks.js';
 
 /* The canonical redirect is the ONE inline script the renderer emits, on every page, by design
    (see js/blocks.js). Script checks below run on the page MINUS that exact byte-string, so any
@@ -49,8 +49,8 @@ const content = JSON.parse(read('content/pages.json'));
   /* Derived from the content, not hardcoded — a count written as a literal has to
      be edited every time an officer adds a page, and the edit that "fixes the
      test" is exactly the edit that stops it noticing a page went missing. */
-  ok(`renders every page in pages.json (${content.pages.length})`,
-     names.length === content.pages.length, names);
+  ok(`renders every page in pages.json (${content.pages.length}) plus register.html`,
+     names.length === content.pages.length + 1 && names.includes('register.html'), names);
   ok('two renders of the same content are byte-identical',
      names.every((n) => a[n] === b[n]),
      names.filter((n) => a[n] !== b[n]));
@@ -70,7 +70,8 @@ const content = JSON.parse(read('content/pages.json'));
   const script = '(function(){' + strip(read('js/render.js')) + '\n' + strip(read('js/blocks.js')) +
                  '\nreturn { renderSite };})()';
 
-  const sandbox = Object.create(null);
+  // URL is one of the Web APIs a Worker has (the meeting-link allowlist parses with it); nothing Node-only.
+  const sandbox = Object.assign(Object.create(null), { URL });
   let worker = null, err = null;
   try {
     worker = vm.runInNewContext(script, vm.createContext(sandbox), { timeout: 10000 });
@@ -130,8 +131,10 @@ const content = JSON.parse(read('content/pages.json'));
             items: [{ icon: BAD_SRC, lines: [[{ text: XSS, href: BAD_URL, external: true }]] }] },
           { type: 'iconRows', layout: 'inline', items: [{ icon: BAD_SRC, lines: [[{ text: XSS }]] }] },
           { type: 'contactForm', heading: XSS, submitLabel: XSS, note: XSS },
-          { type: 'rsvpForm', eventId: 'jun-18', heading: XSS, submitLabel: XSS, successMessage: XSS },
-          { type: 'rsvpForm', eventId: XSS, heading: XSS },
+          { type: 'events', items: [
+            { title: XSS, register: true, id: XSS, meetingPublic: true, meetingLink: XSS },
+            { title: XSS, register: true, id: 'ok-id', meetingPublic: true, meetingLink: 'https://zoom.us/j/1"><script>alert(3)</script>' },
+            { title: XSS, register: true, id: 'ok-id-2', meetingPublic: true, meetingLink: BAD_URL }] },
           { type: 'group', marginBottom: BAD_STYLE, blocks: [{ type: 'text', text: XSS }] },
           { type: 'split', columns: BAD_STYLE, gap: BAD_STYLE, maxWidth: BAD_STYLE,
             left: [{ type: 'text', text: XSS }], right: [{ type: 'text', text: XSS }] },
@@ -249,11 +252,17 @@ const content = JSON.parse(read('content/pages.json'));
     ok(`${name} carries the canonical redirect exactly once, in <head>`,
        full.split(CANONICAL_REDIRECT).length === 2 && head.includes(CANONICAL_REDIRECT));
     const html = withoutCanon(full);
-    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+    /* register.html carries its events as an inert JSON data block (type="application/json" is
+       never executed). That is the only non-empty script element allowed, and only there. */
+    const all = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+    const data = all.filter((m) => /type="application\/json"/.test(m[1]));
+    const scripts = all.filter((m) => !/type="application\/json"/.test(m[1]));
     const hasForm = /<form\b/i.test(html);
     ok(`${name} has no inline script and no event-handler attributes`,
        scripts.every((m) => m[2].trim() === '') && !/ on[a-z]+=/i.test(html),
        scripts.map((m) => m[2].slice(0, 40)));
+    ok(`${name} carries ${name === 'register.html' ? 'exactly one JSON data block' : 'no JSON data block'}`,
+       data.length === (name === 'register.html' ? 1 : 0), data.length);
     const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
     ok(`${name} loads only permitted scripts`, srcs.every((u) => ALLOWED_SRC.includes(u)), srcs);
     if (hasForm) {
@@ -266,7 +275,8 @@ const content = JSON.parse(read('content/pages.json'));
        join.html and 404.html are reachable but not nav entries, so zero is right
        for them — derived from site.json rather than a list of exceptions. */
     const page = content.pages.find((pg) => pg.slug + '.html' === name);
-    const expected = navHrefs.includes(page.navHref) ? 1 : 0;
+    // register.html isn't a content page; it files itself under Events.
+    const expected = navHrefs.includes(page ? page.navHref : 'events.html') ? 1 : 0;
     ok(`${name} marks its own nav link active (${expected})`,
        (html.match(/wcaa-nav__link--active/g) || []).length === expected);
   }
@@ -316,11 +326,44 @@ const content = JSON.parse(read('content/pages.json'));
   ok('the form targets /api/contact with or without a key',
      withoutKey.includes('data-endpoint="/api/contact"') && withKey.includes('data-endpoint="/api/contact"'));
 
-  // An rsvpForm with no event id renders nothing rather than a form that cannot work.
-  ok('an rsvpForm without an event id renders nothing',
-     renderBlocks([{ type: 'rsvpForm', heading: 'Register' }], site) === '');
-  ok('an rsvpForm with an event id renders a form',
-     renderBlocks([{ type: 'rsvpForm', eventId: 'jun-18' }], site).includes('name="event_id" value="jun-18"'));
+}
+
+/* ---------- 5b. registration + meeting links on the event card, and register.html ---------- */
+{
+  const card = (e) => renderBlocks([{ type: 'events', items: [Object.assign({ month: 'Oct', day: '14', title: 'Fall Tour' }, e)] }], site);
+  ok('an event taking registration gets a Register button to register.html?event=<id>',
+     card({ register: true, id: 'oct-14-fall-tour' }).includes('href="register.html?event=oct-14-fall-tour">Register for this event</a>'));
+  ok('...but not with registration off', !card({ register: false, id: 'oct-14-fall-tour' }).includes('register.html'));
+  ok('...and not with an id that isn’t a valid registration id', !card({ register: true, id: 'Bad Id' }).includes('register.html'));
+  ok('...and not with no id at all', !card({ register: true }).includes('register.html'));
+  ok('a meeting link shown to everyone renders “Join the meeting” on the card',
+     card({ meetingPublic: true, meetingLink: 'https://us02web.zoom.us/j/123' }).includes('href="https://us02web.zoom.us/j/123" target="_blank" rel="noreferrer">Join the meeting</a>'));
+  /* ⛔ The private case: nothing about the link may reach published HTML. */
+  const priv = card({ register: true, id: 'x-1', meetingPublic: false, meetingLink: 'https://zoom.us/j/999SECRET' });
+  ok('a PRIVATE meeting link appears nowhere on the card', !priv.includes('999SECRET') && !priv.includes('Join the meeting'));
+  ok('a public link that isn’t Zoom/Meet/Teams renders no button',
+     !card({ meetingPublic: true, meetingLink: 'https://evil.example.com/j/1' }).includes('Join the meeting'));
+
+  const reg = (items, pages) => renderRegisterPage({ pages: pages || [{ slug: 'events', sections: [{ blocks: [{ type: 'events', items }] }] }] }, site);
+  const json = (html) => JSON.parse(html.match(/<script type="application\/json" id="reg-events">([\s\S]*?)<\/script>/)[1]);
+  const two = reg([{ title: 'Fall Tour', month: 'Oct', day: '14', time: '6 PM', location: 'Philadelphia', register: true, id: 'fall' },
+                   { title: 'Not taking sign-ups', register: false, id: 'nope' }]);
+  ok('register.html lists exactly the events taking registration', JSON.stringify(Object.keys(json(two))) === '["fall"]', json(two));
+  ok('...with the details the page shows', json(two).fall.when === 'Oct 14 · 6 PM' && json(two).fall.where === 'Philadelphia', json(two).fall);
+  ok('register.html never carries a meeting link, private or public',
+     !reg([{ title: 'T', register: true, id: 't', meetingPublic: true, meetingLink: 'https://zoom.us/j/LEAK' }]).includes('LEAK'));
+  const hostileTitle = '</script><script>alert(1)</script>';
+  const h = reg([{ title: hostileTitle, register: true, id: 'h' }]);
+  ok('an event title cannot close the JSON block (< is escaped)',
+     h.split('</script>').length === h.split('<script').length && json(h).h.title === hostileTitle);
+  ok('register.html has the three fields, with the right phone keyboards',
+     /name="name" type="text" autocomplete="name"/.test(two) && /name="email" type="email" autocomplete="email" inputmode="email" required/.test(two) &&
+     /name="phone" type="tel" autocomplete="tel" inputmode="tel"/.test(two) && (two.match(/class="wcaa-field__input"/g) || []).length === 3);
+  ok('register.html carries the honeypot and the privacy notice',
+     two.includes('name="website" tabindex="-1"') && two.includes('Your information goes only to the WCAA NJ/SE-PA chapter for this event.'));
+  ok('register.html’s “back” goes to the Events page when there is one, else home',
+     two.includes('href="events.html">Back to the events</a>') &&
+     reg([{ title: 'T', register: true, id: 't' }], [{ slug: 'index', sections: [{ blocks: [{ type: 'events', items: [{ title: 'T', register: true, id: 't' }] }] }] }]).includes('href="index.html">Back to the events</a>'));
 }
 
 /* ---------- 6. no interactive element that does nothing when clicked ---------- */
@@ -365,6 +408,9 @@ const content = JSON.parse(read('content/pages.json'));
       if (!(type === 'submit' && wired)) dead.push(strip(m[2]));
     }
     for (const m of html.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)) {
+      /* A link rendered `hidden` can't be seen or clicked. register.html's "Join the meeting"
+         is one: js/forms.js gives it the href from the server's reply and only then shows it. */
+      if (/(^|\s)hidden(\s|$)/.test(m[1])) continue;
       const href = attrOf('<a ' + m[1] + '>', 'href');
       if (href === null || href.trim() === '' || href.trim() === '#') dead.push(strip(m[2]));
     }
@@ -439,7 +485,38 @@ const content = JSON.parse(read('content/pages.json'));
   ok('every click path resolves to the block it claims to be', wrong.length === 0, wrong.slice(0, 3));
   const home = renderPage(content.pages.find((p) => p.slug === 'index'), site, { edit: true });
   ok('an EMPTY events block gets a visible, clickable stand-in in the editor',
-     /data-edit-type="events" class="wcaa-edit-empty"[^>]*>No events listed yet/.test(home));
+     /data-edit-type="events"[^>]*class="wcaa-edit-empty"[^>]*>No events listed yet/.test(home));
+  ok('...and clicking it adds an event (data-add points at its items)',
+     /data-edit-type="events" data-add="sections\.\d+\.blocks\.\d+\.right\.\d+\.items"/.test(home));
+
+  /* In-place editing: every data-f / data-item / data-add path must resolve on the page object
+     with the SAME dotted walk admin/app.js getAt() does, and a data-f must land on TEXT whose
+     value is what the element shows — or typing on the page writes into the wrong field. */
+  const getAt = (root, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), root);
+  let fields = 0, items = 0, adds = 0, bad = [];
+  for (const page of content.pages) {
+    const html = renderPage(page, site, { edit: true });
+    for (const m of html.matchAll(/<([a-z0-9]+)[^>]* data-f="([^"]+)"[^>]*>([^<]*)</g)) {
+      fields++;
+      const v = getAt(page, unesc(m[2]));
+      const shown = m[3].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+      if (typeof v !== 'string' || shown !== v) bad.push(page.slug + ' ' + m[2]);
+    }
+    for (const m of html.matchAll(/data-item="([^"]+)"/g)) { items++; const v = getAt(page, m[1]); if (!v || typeof v !== 'object') bad.push(page.slug + ' item ' + m[1]); }
+    for (const m of html.matchAll(/data-add="([^"]+)"/g)) {
+      adds++;
+      const block = getAt(page, m[1].replace(/\.items$/, ''));
+      if (!block || !/\.items$/.test(m[1])) bad.push(page.slug + ' add ' + m[1]);
+    }
+    const pub = renderPage(page, site);
+    if (/data-f=|data-item=|data-add=|data-hero|wcaa-edit-add/.test(pub)) bad.push(page.slug + ' published carries editor markup');
+  }
+  ok(`every typeable field resolves to the text it shows (${fields} fields, ${items} items, ${adds} add buttons)`,
+     bad.length === 0 && fields > 40 && items > 5 && adds > 3, bad.slice(0, 4));
+  const events = renderPage(content.pages.find((p) => p.slug === 'events'), site, { edit: true });
+  ok('an event’s title, date, time, place and description are each typeable',
+     ['title', 'month', 'day', 'time', 'location', 'description'].every((k) => new RegExp('data-f="sections\\.\\d+\\.blocks\\.\\d+\\.items\\.0\\.' + k + '"').test(events)));
+  ok('the hero is clickable and its title typeable in the editor', home.includes(' data-hero') && home.includes('data-f="hero.title"'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

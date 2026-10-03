@@ -17,8 +17,10 @@
    The form needs JavaScript, because the Turnstile widget does. That is the one
    place on this site that is true; the six content pages ship none. */
 import { json } from './_lib.js';
+import { safeMeetingUrl } from '../../js/render.js';
 import { readBody, validate, text, multiline, email as emailField, phone as phoneField, count } from './_input.js';
 import { verifyTurnstile } from './_turnstile.js';
+import { honeypotFilled, rateLimited, RATE_LIMIT_MESSAGE } from './_guard.js';
 
 const GENERIC = 'Something went wrong sending your RSVP. Please try again, or contact the chapter directly.';
 
@@ -29,6 +31,10 @@ export async function onRequest(context) {
 
   const body = await readBody(request);
   if (!body) return json({ ok: false, error: 'We couldn’t read that form. Please try again.' }, 400);
+
+  // Bots get the same answer a person does, and nothing is written (see _guard.js).
+  if (honeypotFilled(body)) return json({ ok: true });
+  if (await rateLimited(env, request, 'rsvp')) return json({ ok: false, error: RATE_LIMIT_MESSAGE }, 429);
 
   const gate = await verifyTurnstile(env, body['cf-turnstile-response'], request);
   if (!gate.ok) return json({ ok: false, error: gate.error }, gate.status);
@@ -96,5 +102,13 @@ export async function onRequest(context) {
     }, 409);
   }
 
-  return json({ ok: true, event: event.title, guests: f.guests });
+  /* The meeting link goes to the person who just registered, and only to them (see migration
+     0002). Missing table or no link: they're still registered, there's just no button. */
+  let meeting = null;
+  try {
+    const link = await env.DB.prepare('SELECT url FROM event_links WHERE event_id = ?').bind(f.event_id).first();
+    meeting = link && safeMeetingUrl(link.url) ? safeMeetingUrl(link.url) : null;
+  } catch { /* migration 0002 not applied yet */ }
+
+  return json({ ok: true, event: event.title, guests: f.guests, meeting });
 }

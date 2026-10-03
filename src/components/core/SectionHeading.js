@@ -3,7 +3,7 @@ try { (() => {
 const css = `
 .wcaa-sh{margin:0 0 var(--space-8)}
 .wcaa-sh--center{text-align:center}
-.wcaa-sh__kicker{font:var(--type-label);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--gold-600);margin-bottom:var(--space-3)}
+.wcaa-sh__kicker{font:var(--type-label);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--gold-700);margin-bottom:var(--space-3)}
 .wcaa-sh__title{font-family:var(--font-display);font-weight:400;color:var(--text-heading);font-size:var(--text-3xl);line-height:var(--leading-tight);margin:0 0 var(--space-4)}
 .wcaa-sh--sm .wcaa-sh__title{font-size:var(--text-2xl)}
 .wcaa-sh__rule{width:var(--rule-w);height:var(--rule-h);background:var(--gold-500)}

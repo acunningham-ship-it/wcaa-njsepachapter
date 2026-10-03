@@ -24,6 +24,58 @@
     box.hidden = false;
   }
 
+  /* Show a panel, optionally setting its text first (textContent, never innerHTML). Empty text
+     keeps it hidden, so a blank line never takes up room on screen. */
+  function show(id, text) {
+    var node = document.getElementById(id);
+    if (!node) return;
+    if (text !== undefined) node.textContent = text;
+    node.hidden = text !== undefined && !text;
+  }
+  function hide(id) {
+    var node = document.getElementById(id);
+    if (node) node.hidden = true;
+  }
+
+  /* register.html: the event comes from the address (?event=<id>) and its details from the JSON
+     the page carries. An id that isn't there leaves the "Choose an event first" panel up and the
+     form hidden — there is nothing to register for. */
+  var regEvent = null;
+  var regData = document.getElementById('reg-events');
+  if (regData && document.getElementById('reg-form')) {
+    var all = {};
+    try { all = JSON.parse(regData.textContent) || {}; } catch (e) { all = {}; }
+    var wanted = new URLSearchParams(location.search).get('event') || '';
+    regEvent = Object.prototype.hasOwnProperty.call(all, wanted) ? all[wanted] : null;
+    if (regEvent) {
+      document.getElementById('reg-id').value = wanted;
+      show('reg-title', regEvent.title);
+      show('reg-when', [regEvent.when, regEvent.where].filter(Boolean).join(' · '));
+      hide('reg-missing');
+      document.getElementById('reg-form').hidden = false;
+    }
+  }
+
+  /* After a registration: one screen that says it worked, and the meeting button when the event
+     has a link. The link is also printed as text, because the person has to get back to it on
+     the day and this page is the only place it appears. */
+  function registered(form, body) {
+    form.hidden = true;
+    show('reg-done-title', regEvent ? regEvent.title : 'this event');
+    show('reg-done-when', regEvent ? [regEvent.when, regEvent.where].filter(Boolean).join(' · ') : '');
+    var join = document.getElementById('reg-join');
+    if (join && typeof body.meeting === 'string' && /^https:\/\//i.test(body.meeting)) {
+      join.href = body.meeting;
+      join.hidden = false;
+      show('reg-join-url', body.meeting);
+      show('reg-join-note');
+    }
+    var done = document.getElementById('reg-done');
+    done.hidden = false;
+    window.scrollTo(0, 0);
+    done.focus();
+  }
+
   function collect(form) {
     var data = {};
     var entries = new FormData(form).entries();
@@ -56,6 +108,7 @@
         if (!r.ok || !r.body.ok) {
           throw new Error(r.body.error || 'Something went wrong. Please try again.');
         }
+        if (form.hasAttribute('data-register')) { registered(form, r.body); return; }
         setMessage(form, form.getAttribute('data-success') || 'Thank you — we’ve received that.', 'ok');
         form.reset();
         /* Turnstile tokens are single-use. Without this reset a second submit

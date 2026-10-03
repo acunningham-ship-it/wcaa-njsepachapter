@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register for an event — WCAA Southeastern PA &amp; NJ Chapter</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/pages.css">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script src="js/forms.js" defer></script>
+<!-- canonical-redirect: the github.io mirror serves the SAME master branch as the .com
+     (GitHub Pages + Cloudflare Pages, one source). A plain redirect in this file would run on
+     BOTH and loop the .com onto itself, so it is guarded by hostname and can only ever fire on
+     the mirror. Path-mapped because the mirror serves under /wcaa-njsepachapter/ while the .com
+     serves at root — redirecting to the bare domain would dump every deep link on the homepage. -->
+<script>
+(function(){
+  var CANON = "https://wcaa-njsepachapter.com", MIRROR = "acunningham-ship-it.github.io", BASE = "/wcaa-njsepachapter";
+  function target(host, path, search, hash){
+    if (host !== MIRROR) return null;
+    path = path.replace(new RegExp("^" + BASE + "(?=/|$)"), "") || "/";
+    return CANON + path + (search || "") + (hash || "");
+  }
+  if (typeof window !== "undefined") window.__wcaaRedirectTarget = target;
+  var t = (typeof location !== "undefined") && target(location.hostname, location.pathname, location.search, location.hash);
+  if (t) location.replace(t);
+})();
+</script>
+</head>
+<body>
+<nav class="wcaa-nav"><div class="wcaa-nav__in"><a class="wcaa-nav__brand" href="index.html"><img class="wcaa-nav__logo" src="assets/wcaa-logo.png" alt="WCAA — Window Coverings Association of America" width="48" height="48"><span class="wcaa-nav__div"></span><span class="wcaa-nav__sub">New Jersey &amp; Southeastern Pennsylvania Chapter</span></a><div class="wcaa-nav__links"><a class="wcaa-nav__link" href="index.html">Home</a><a class="wcaa-nav__link" href="about.html">About Us</a><a class="wcaa-nav__link wcaa-nav__link--active" href="events.html">Events</a><a class="wcaa-nav__link" href="gallery.html">Gallery</a><a class="wcaa-nav__link" href="contact.html">Contact Us</a><a class="wcaa-btn wcaa-btn--gold wcaa-btn--sm" href="join.html">Join / Renew</a></div></div></nav><section class="wcaa-hero wcaa-hero--page" style="min-height:240px"><div class="wcaa-hero__ovl"></div><div class="wcaa-hero__in"><h1 class="wcaa-hero__title">Event registration</h1><div class="wcaa-hero__rule"></div></div></section><section class="wcaa-sec"><div class="wcaa-sec__in wcaa-sec__in--narrow"><div class="wcaa-reg"><div class="wcaa-reg__panel" id="reg-missing"><h2 class="wcaa-reg__title">Choose an event first</h2><p class="wcaa-reg__lead">Go to the events page and press <strong>Register for this event</strong> on the one you want to attend.</p><a class="wcaa-btn wcaa-btn--primary wcaa-btn--lg" href="events.html">See the events</a></div><form class="wcaa-form wcaa-reg__panel" id="reg-form" method="post" action="/api/rsvp" data-endpoint="/api/rsvp" data-register hidden><p class="wcaa-reg__kicker">You’re registering for</p><h2 class="wcaa-reg__title" id="reg-title"></h2><p class="wcaa-reg__lead" id="reg-when"></p><input type="hidden" name="event_id" id="reg-id" value=""><div class="wcaa-field wcaa-reg__field"><label class="wcaa-field__label" for="reg-name">Your name</label><input class="wcaa-field__input" id="reg-name" name="name" type="text" autocomplete="name" autocapitalize="words" required></div><div class="wcaa-field wcaa-reg__field"><label class="wcaa-field__label" for="reg-email">Email</label><input class="wcaa-field__input" id="reg-email" name="email" type="email" autocomplete="email" inputmode="email" required></div><div class="wcaa-field wcaa-reg__field"><label class="wcaa-field__label" for="reg-phone">Phone <span class="wcaa-reg__opt">(optional)</span></label><input class="wcaa-field__input" id="reg-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel"></div><div class="wcaa-hp" aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div><p class="wcaa-reg__notice">Your information goes only to the WCAA NJ/SE-PA chapter for this event.</p><div class="cf-turnstile" data-sitekey="0x4AAAAAAEr6rPnW4qEGmMne" style="margin-bottom:var(--space-4)"></div><button class="wcaa-btn wcaa-btn--primary wcaa-btn--lg wcaa-btn--full" type="submit">Register</button><p class="wcaa-form__msg" role="alert" hidden></p></form><div class="wcaa-reg__panel" id="reg-done" tabindex="-1" hidden><h2 class="wcaa-reg__title">You’re registered for <span id="reg-done-title"></span></h2><p class="wcaa-reg__lead" id="reg-done-when"></p><a class="wcaa-btn wcaa-btn--primary wcaa-btn--lg" id="reg-join" target="_blank" rel="noreferrer" hidden>Join the meeting</a><p class="wcaa-reg__lead" id="reg-join-note" hidden>Save this link, you’ll use it to join on the day: <span class="wcaa-reg__url" id="reg-join-url"></span><br>Lost it? Register again with the same email and it will show here again.</p><a class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" href="events.html">Back to the events</a></div><script type="application/json" id="reg-events">{}</script></div></div></section><footer class="wcaa-foot"><div class="wcaa-foot__mark">WCAA</div><div class="wcaa-foot__rule"></div><div class="wcaa-foot__sub">New Jersey &amp; Southeastern Pennsylvania Chapter</div><div class="wcaa-foot__links"><a href="index.html">Home</a><a href="about.html">About Us</a><a href="events.html">Events</a><a href="gallery.html">Gallery</a><a href="contact.html">Contact Us</a><a href="join.html">Join/Renew</a></div><div class="wcaa-foot__soc"><a href="https://www.instagram.com/wcaasepanjchapter/" aria-label="Instagram" target="_blank" rel="noreferrer"><span aria-hidden="true" style="display:inline-block;width:18px;height:18px;background:currentColor;-webkit-mask:url(assets/icons/instagram.svg) center/contain no-repeat;mask:url(assets/icons/instagram.svg) center/contain no-repeat;flex:none"></span></a></div><div class="wcaa-foot__copy">Copyright © 2026 Window Coverings Association of America — New Jersey and Southeastern Pennsylvania Chapter — All Rights Reserved.</div></footer>
+</body>
+</html>

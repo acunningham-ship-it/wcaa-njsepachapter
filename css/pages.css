@@ -84,3 +84,34 @@
    .wcaa-btn--full, which exists on join.html alone. The residue is that the three
    dues links stand 2px taller than a <button> would. Add line-height if the button
    family is ever unified deliberately -- not as a side effect of this fix. */
+
+/* ---------- event registration (register.html + the Register button on each event) ----------
+   Written for the chapter's members, many of them older: 18px text at minimum, 52px-tall
+   buttons with plain words (no all-caps), one thing on screen at a time. */
+.wcaa-ev__meta, .wcaa-ev__desc { font-size: 18px; }
+.wcaa-ev__mo { font-size: 18px; }
+.wcaa-ev__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.wcaa-ev__actions .wcaa-btn,
+.wcaa-reg .wcaa-btn { min-height: 52px; font-size: 18px; text-transform: none; letter-spacing: normal; }
+
+/* The field bots fill and people never see (functions/api/_guard.js). Off-screen, not
+   display:none, because some bots skip inputs that aren't rendered. */
+.wcaa-hp { position: absolute !important; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+.wcaa-reg__panel {
+  background: var(--surface-card); border-radius: var(--radius-md); box-shadow: var(--shadow-card);
+  padding: var(--space-8); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-5);
+  font-size: 18px;
+}
+.wcaa-reg__panel[hidden] { display: none; }
+.wcaa-reg__panel:focus { outline: none; }
+.wcaa-reg__panel .wcaa-reg__field, .wcaa-reg__panel .cf-turnstile, .wcaa-reg__panel .wcaa-form__msg { align-self: stretch; }
+.wcaa-reg__kicker { margin: 0; font: 600 18px/1.3 var(--font-body); color: var(--text-muted); }
+.wcaa-reg__title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: var(--text-2xl); line-height: 1.2; color: var(--text-heading); }
+.wcaa-reg__lead, .wcaa-reg__notice { margin: 0; font-size: 18px; line-height: 1.5; color: var(--text-body); }
+.wcaa-reg__field .wcaa-field__label { font-size: 18px; }
+.wcaa-reg__field .wcaa-field__input { font-size: 18px; min-height: 52px; padding: 12px 14px; box-sizing: border-box; }
+.wcaa-reg__opt { font-weight: 400; color: var(--text-muted); }
+.wcaa-reg__url { word-break: break-all; font-weight: 600; color: var(--text-heading); }
+.wcaa-reg .wcaa-form__msg { font-size: 18px; }
+@media (max-width: 600px) { .wcaa-reg__panel { padding: var(--space-6) var(--space-5); } }

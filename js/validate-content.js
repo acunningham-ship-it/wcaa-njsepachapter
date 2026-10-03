@@ -19,11 +19,15 @@
  * "safe text" would be sanitise-at-storage by another name, and would have to
  * guess every context the value later lands in.
  */
-import { BLOCK_TYPES } from './blocks.js';
+import { BLOCK_TYPES, EVENT_ID, eventItems } from './blocks.js';
+import { safeMeetingUrl } from './render.js';
 
 /* A slug becomes a filename. Leading digit allowed so "404" can exist; no dots
    and no slashes, so it cannot traverse or pick its own extension. */
 const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
+/* Generated pages that are not in pages.json (js/blocks.js renderSite). A content page with the
+   same slug would overwrite one, so the names are taken. */
+const RESERVED_SLUGS = ['register'];
 
 /* Keys whose value is rendered as TEXT. They must be scalars.
    esc() stringifies whatever it is given, so a block that arrives with
@@ -34,7 +38,7 @@ const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const TEXT_KEYS = [
   'title', 'text', 'label', 'caption', 'alt', 'kicker', 'lede', 'name', 'role', 'note',
   'heading', 'month', 'day', 'badge', 'time', 'location', 'description', 'submitLabel',
-  'n', 'phone', 'email', 'src', 'href', 'icon', 'iconAfter', 'id', 'type', 'slug',
+  'n', 'phone', 'email', 'src', 'href', 'icon', 'iconAfter', 'id', 'type', 'slug', 'meetingLink',
 ];
 
 function checkTextKeys(value, path) {
@@ -108,6 +112,31 @@ const SAMPLES = {
   officers: ['name', 'Name'],
 };
 
+/* Registration and meeting links on one event. The messages are for an officer: they say what
+   to do, not what the field is called. */
+function checkEvent(e, p) {
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+  const hasId = e.id !== undefined && e.id !== '';
+  if (hasId && (typeof e.id !== 'string' || !EVENT_ID.test(e.id))) {
+    return err(p + '.id', 'has a registration id that isn’t valid (lowercase letters, numbers and hyphens).');
+  }
+  for (const key of ['register', 'meetingPublic']) {
+    if (e[key] !== undefined && typeof e[key] !== 'boolean') return err(`${p}.${key}`, 'must be ticked or unticked.');
+  }
+  if (e.register && !hasId) return err(p, 'takes registrations but has no registration id. Reopen it in the editor and save again.');
+  const link = typeof e.meetingLink === 'string' ? e.meetingLink.trim() : '';
+  if (e.meetingLink !== undefined && typeof e.meetingLink !== 'string') return err(p + '.meetingLink', 'must be a link.');
+  if (link && !safeMeetingUrl(link)) {
+    return err(p + '.meetingLink', 'isn’t a meeting link we can use. Paste the full Zoom, Google Meet or Microsoft Teams link, starting with https://');
+  }
+  /* A private link is shown only to people who register, so with registration off nobody would
+     ever see it — say so instead of saving a link that silently goes nowhere. */
+  if (link && !e.meetingPublic && !e.register) {
+    return err(p, 'has a meeting link but doesn’t take registrations, so nobody would see it. Turn on registration, or tick “Show the meeting link to everyone”.');
+  }
+  return null;
+}
+
 function checkBlocks(blocks, path, depth) {
   if (!Array.isArray(blocks)) return err(path, 'must be a list of blocks.');
   if (blocks.length > LIMITS.blocks) return err(path, `has more than ${LIMITS.blocks} blocks.`);
@@ -127,6 +156,12 @@ function checkBlocks(blocks, path, depth) {
       if (hit !== -1) {
         return err(hit ? `${p}.items[${hit - 1}]` : p,
           `still says “${text}” (the sample text). Type the real wording, or remove it.`);
+      }
+    }
+    if (b.type === 'events' && Array.isArray(b.items)) {
+      for (let k = 0; k < b.items.length; k++) {
+        const bad = checkEvent(b.items[k], `${p}.items[${k}]`);
+        if (bad) return bad;
       }
     }
     if (b.type === 'group' || b.type === 'split') {
@@ -163,6 +198,7 @@ export function validateContent(doc) {
     /* A duplicate slug is not a cosmetic problem: two pages render to the same
        filename and the second silently overwrites the first on save. */
     if (seen[page.slug]) return err(p + '.slug', `is already used by ${seen[page.slug]}.`);
+    if (RESERVED_SLUGS.indexOf(page.slug) !== -1) return err(p + '.slug', `“${page.slug}” is used by the website itself. Pick another address.`);
     seen[page.slug] = p;
 
     if (page.hero !== undefined) {
@@ -197,6 +233,18 @@ export function validateContent(doc) {
      array entry away and impossible to notice in an editor that shows you the
      page you are currently editing. */
   if (!seen.index) return err('pages', 'must include the home page (slug "index").');
+
+  /* One registration id = one event (it may be listed on two pages). Two listings sharing an id
+     but naming different meeting links would hand registrants whichever was saved last. */
+  const links = Object.create(null);
+  for (const e of eventItems(doc)) {
+    if (typeof e.id !== 'string' || !e.id || typeof e.meetingLink !== 'string' || !e.meetingLink.trim()) continue;
+    const url = safeMeetingUrl(e.meetingLink);
+    if (links[e.id] !== undefined && links[e.id] !== url) {
+      return err('pages', `list the event “${e.title || e.id}” twice with two different meeting links. Use the same link in both places.`);
+    }
+    links[e.id] = url;
+  }
 
   const bad = checkStrings(doc, 'content', null);
   if (bad) return bad;

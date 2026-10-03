@@ -81,6 +81,21 @@ export function safeSrc(src) {
   return '';
 }
 
+/* An event's meeting link: https on Zoom, Google Meet or Microsoft Teams, nothing else.
+   It becomes a "Join the meeting" button that a registrant clicks without a second look,
+   so an allowlist of the three services the chapter actually uses, not "any https URL".
+   Returns the parsed, normalised URL, or '' when it isn't one of those. */
+const MEETING_HOSTS = /^(?:(?:[a-z0-9-]+\.)*zoom\.us|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com)$/;
+export function safeMeetingUrl(value) {
+  if (typeof value !== 'string') return '';
+  const cleaned = value.trim();
+  if (!cleaned || /[\u0000-\u001F\u007F\s"'<>\\]/.test(cleaned)) return '';
+  let u;
+  try { u = new URL(cleaned); } catch { return ''; }
+  if (u.protocol !== 'https:' || u.username || u.password || u.port) return '';
+  return MEETING_HOSTS.test(u.hostname) ? u.href : '';
+}
+
 /* ---------- small helpers ---------- */
 
 /* Renders an attribute only when it has a value, so we never emit alt="" by

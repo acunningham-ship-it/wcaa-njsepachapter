@@ -65,13 +65,10 @@ const ok = (name, cond, detail) => {
 
     const block = CONTAINERS[type] ? CONTAINERS[type](base) : base;
     const html = renderBlocks([block]);
-    /* Three blocks correctly render nothing until the officer supplies the one
-       thing only they can: a photo, or the id of an event they have opened for
-       registration. That is not the same as a broken default — an rsvpForm
-       pointing at no event would take sign-ups the endpoint then refuses, so
-       rendering nothing is the honest behaviour. The editor marks those fields
-       required, which is where the prompting belongs. */
-    const NEEDS_CONTENT = ['gallery', 'image', 'rsvpForm'];
+    /* Two blocks correctly render nothing until the officer supplies the one
+       thing only they can: a photo. That is not the same as a broken default.
+       The editor marks those fields required, which is where the prompting belongs. */
+    const NEEDS_CONTENT = ['gallery', 'image'];
     const mayBeEmpty = NEEDS_CONTENT.includes(type);
     ok(`the default ${type} renders visible markup`, mayBeEmpty || html.length > 0, { type, html: html.slice(0, 80) });
     ok(`the default ${type} renders no raw < from its own content`,
@@ -84,7 +81,6 @@ const ok = (name, cond, detail) => {
   const filled = {
     gallery: { ...BLOCK_DEFAULTS.gallery(), items: [{ src: 'uploads/site/x.webp', alt: 'A photo' }] },
     image: { ...BLOCK_DEFAULTS.image(), src: 'uploads/site/x.webp', alt: 'A photo' },
-    rsvpForm: { ...BLOCK_DEFAULTS.rsvpForm(), eventId: 'jun-18' },
   };
   for (const [type, block] of Object.entries(filled)) {
     const html = renderBlocks([block], {});
@@ -127,6 +123,47 @@ const ok = (name, cond, detail) => {
      isSimpleLines([[{ text: 'x', strong: true }]]) === false);
   ok('the real contact rows are correctly classified as not-simple',
      isSimpleLines([[{ text: 'Marie Weaverling', strong: true }, { text: ', Chapter President' }]]) === false);
+}
+
+/* ---------- event registration + meeting links: what the validator refuses, in plain words ---------- */
+{
+  const doc = (items, extraPages = []) => ({ pages: [
+    { slug: 'index', navHref: 'index.html', title: 'Home', hero: { title: 'Home' } },
+    { slug: 'events', navHref: 'events.html', title: 'Events', sections: [{ blocks: [{ type: 'events', items }] }] },
+    ...extraPages,
+  ] });
+  const ev = (o) => Object.assign({ month: 'Oct', day: '14', title: 'Fall Tour' }, o);
+  const v = (items, extra) => validateContent(doc(items, extra));
+  ok('an event taking registration, with an id and a Zoom link, is valid',
+     v([ev({ register: true, id: 'oct-14-fall-tour', meetingLink: 'https://us02web.zoom.us/j/1' })]).ok);
+  ok('Google Meet and Teams links are valid too',
+     v([ev({ register: true, id: 'a', meetingLink: 'https://meet.google.com/abc-defg-hij' }),
+        ev({ title: 'B', register: true, id: 'b', meetingLink: 'https://teams.microsoft.com/l/meetup-join/x' })]).ok);
+  let r = v([ev({ register: true, id: 'a', meetingLink: 'https://evil.example.com/j/1' })]);
+  ok('a non-meeting link is refused, pointing at the field, saying what to paste',
+     !r.ok && /meetingLink$/.test(r.path) && /Zoom, Google Meet or Microsoft Teams/.test(r.error), r);
+  r = v([ev({ register: true, id: 'a', meetingLink: 'http://zoom.us/j/1' })]);
+  ok('an http (not https) meeting link is refused', !r.ok, r);
+  r = v([ev({ meetingLink: 'https://zoom.us/j/1' })]);
+  ok('a PRIVATE link on an event that takes no registration is refused (nobody would see it)',
+     !r.ok && /doesn’t take registrations/.test(r.error), r);
+  ok('...but the same link shown to everyone is fine', v([ev({ meetingLink: 'https://zoom.us/j/1', meetingPublic: true })]).ok);
+  r = v([ev({ register: true })]);
+  ok('registration with no id is refused', !r.ok && /no registration id/.test(r.error), r);
+  r = v([ev({ register: true, id: 'Has Spaces' })]);
+  ok('a malformed registration id is refused', !r.ok && /\.id$/.test(r.path), r);
+  r = v([ev({ register: 'yes', id: 'a' })]);
+  ok('register must be ticked/unticked (a boolean), not text', !r.ok, r);
+  r = v([ev({ register: true, id: 'same', meetingLink: 'https://zoom.us/j/1' }),
+         ev({ register: true, id: 'same', meetingLink: 'https://zoom.us/j/2' })]);
+  ok('one event listed twice with two different meeting links is refused', !r.ok && /two different meeting links/.test(r.error), r);
+  ok('...and listed twice with the same link is fine',
+     v([ev({ register: true, id: 'same', meetingLink: 'https://zoom.us/j/1' }), ev({ register: true, id: 'same', meetingLink: 'https://zoom.us/j/1' })]).ok);
+  r = v([], [{ slug: 'register', navHref: 'register.html', title: 'X', hero: { title: 'X' } }]);
+  ok('a page can’t take the address “register” (the registration page lives there)', !r.ok && /used by the website itself/.test(r.error), r);
+  const evFields = FIELDS.events.find((f) => f.kind === 'items').fields.map((f) => f.key);
+  ok('the event form offers registration, the meeting link and “show to everyone”',
+     ['register', 'meetingLink', 'meetingPublic'].every((k) => evFields.includes(k)), evFields);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

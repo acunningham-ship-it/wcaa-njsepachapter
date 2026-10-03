@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Site manager — WCAA NJ &amp; Southeastern PA Chapter</title>
+<title>Website editor — WCAA NJ &amp; Southeastern PA Chapter</title>
 <link rel="stylesheet" href="../styles.css">
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
 
-<section id="signin" hidden>
+<main id="signin" hidden>
   <form id="signin-form" class="signin-card">
     <img class="signin-logo" src="../assets/wcaa-logo.png" alt="WCAA" width="60" height="60">
-    <h1>Site manager</h1>
-    <p class="hint">Sign in to edit the chapter website.</p>
+    <h1>Website editor</h1>
+    <p class="hint">Sign in to change the chapter website.</p>
     <label class="field">
       <span class="field-label">Username</span>
-      <input class="input" id="username" name="username" type="text" autocomplete="username" required>
+      <input class="input" id="username" name="username" type="text" autocomplete="username" autocapitalize="none" required>
     </label>
     <label class="field">
       <span class="field-label">Password</span>
@@ -26,33 +26,53 @@
     <button class="btn btn--primary" type="submit">Sign in</button>
     <p class="status status--bad" id="signin-error" role="alert"></p>
   </form>
-</section>
+</main>
 
 <div id="app" hidden>
   <header class="bar">
-    <img class="bar-logo" src="../assets/wcaa-logo.png" alt="WCAA" width="30" height="30">
-    <span class="bar-title">Site manager</span>
-    <div class="modes">
-      <button class="mode is-on" id="mode-content" type="button">Content</button>
-      <button class="mode" id="mode-events" type="button">Events</button>
-    </div>
-    <span class="status" id="status" role="status">Everything is saved.</span>
-    <button class="btn btn--primary" id="save" type="button" disabled>Save changes</button>
+    <img class="bar-logo" src="../assets/wcaa-logo.png" alt="" width="36" height="36">
+    <span class="bar-title">Website editor</span>
+    <nav class="modes" aria-label="What to work on">
+      <button class="mode is-on" id="mode-content" type="button" aria-pressed="true">Change the website</button>
+      <button class="mode" id="mode-events" type="button" aria-pressed="false">Event sign-ups</button>
+    </nav>
   </header>
 
-  <main class="cols">
-    <!-- Structure: pages, sections, blocks. The only place the shape is visible. -->
-    <section class="col col--outline" id="outline" aria-label="Site structure"></section>
-    <!-- The selected block's fields. -->
-    <section class="col col--editor" id="editor" aria-label="Block settings"></section>
-    <!-- Rendered by js/blocks.js — the same module the server uses at save time. -->
-    <section class="col col--preview">
-      <iframe id="preview" title="Preview of this page"></iframe>
-    </section>
+  <main id="content-view">
+    <div class="toolbar">
+      <label class="page-pick">
+        <span>Page you’re changing:</span>
+        <select class="input" id="page-select"></select>
+      </label>
+      <button class="btn btn--quiet" id="open-layout" type="button">Add or move sections</button>
+    </div>
+    <p class="hint-strip" id="hint"><strong>Click any words on the page to change them.</strong>
+      To change a photo, a button or an event’s details, click it.</p>
+    <div class="stage">
+      <!-- Rendered by js/blocks.js, the same code the server uses when you save. -->
+      <iframe id="preview" title="The page you are changing"></iframe>
+    </div>
   </main>
 
-  <!-- Event registration (D1 state, not site content). Populated by app.js. -->
-  <section class="events-view" id="events-view" hidden></section>
+  <!-- Details for the one thing that was clicked: an event, a photo, a button... -->
+  <aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden>
+    <div class="drawer-head">
+      <h2 id="drawer-title"></h2>
+      <button class="btn btn--primary" id="drawer-close" type="button">Done</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <footer class="savebar" id="savebar">
+    <p class="status" id="status" role="status">Everything is saved.</p>
+    <div class="savebar-actions">
+      <button class="btn btn--quiet" id="discard" type="button" disabled>Discard changes</button>
+      <button class="btn btn--primary" id="save" type="button" disabled>Save changes</button>
+    </div>
+  </footer>
+
+  <!-- Who registered for what. Lives in the database, never in the website's files. -->
+  <main class="events-view" id="events-view" hidden></main>
 </div>
 
 <script type="module" src="app.js"></script>

@@ -20,7 +20,8 @@
 import { json, requireSession, missingEnv, ghGetFile, ghCommitFiles } from './_lib.js';
 import { readBody } from './_input.js';
 import { validateContent, contentFingerprint } from '../../js/validate-content.js';
-import { renderSite } from '../../js/blocks.js';
+import { renderSite, eventItems, registerableEvents, EVENT_ID } from '../../js/blocks.js';
+import { safeMeetingUrl } from '../../js/render.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
@@ -38,6 +39,59 @@ function validateSite(site) {
     if (Array.isArray(site[key]) && site[key].length > 40) return { ok: false, error: `Site settings: ${key} has too many entries.` };
   }
   return { ok: true };
+}
+
+/* ⛔ A PRIVATE MEETING LINK NEVER REACHES THE REPO. The repo is public, and so is the deployed
+   /content/pages.json, so a link meant only for registrants is taken OUT of the content here,
+   server-side, before anything is committed, and stored in D1 (migration 0002) instead. Only a
+   link the officer ticked "show to everyone" stays in the content, because the card needs it.
+   links: id -> url to store | null to remove. An item WITHOUT a meetingLink key leaves D1 alone
+   (that is how the admin says "I didn't load or touch this one"); an empty string removes it. */
+export function splitPrivateLinks(content) {
+  const committed = JSON.parse(JSON.stringify(content));
+  const links = new Map();
+  for (const e of eventItems(committed)) {
+    if (!Object.prototype.hasOwnProperty.call(e, 'meetingLink')) continue;
+    const url = safeMeetingUrl(e.meetingLink);
+    if (e.register === true && typeof e.id === 'string' && EVENT_ID.test(e.id)) links.set(e.id, url || null);
+    if (e.meetingPublic === true && url) e.meetingLink = url;
+    else delete e.meetingLink;
+  }
+  return { committed, links };
+}
+
+/* Registration state follows the content. Every event that takes registration has an events
+   row (title kept in step); turning registration ON for an event reopens it, turning it OFF
+   closes it, and a "Close" pressed on the Sign-ups screen is left alone while it stays on.
+   Runs BEFORE the commit: if it fails, nothing is saved, rather than a Register button going
+   live in front of an event the database refuses. */
+async function syncRegistration(env, previous, committed, links) {
+  const now = registerableEvents(committed);
+  const before = previous ? registerableEvents(previous) : {};
+  const ops = [];
+  for (const [id, e] of Object.entries(now)) {
+    const title = String(e.title).slice(0, 200);
+    ops.push(before[id]
+      ? ['INSERT INTO events (id, title) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET title = excluded.title', [id, title]]
+      : ['INSERT INTO events (id, title, closed) VALUES (?, ?, 0) ON CONFLICT (id) DO UPDATE SET title = excluded.title, closed = 0', [id, title]]);
+  }
+  for (const id of Object.keys(before)) {
+    if (!now[id]) ops.push(['UPDATE events SET closed = 1 WHERE id = ?', [id]]);
+  }
+  for (const [id, url] of links) {
+    if (!now[id]) continue;
+    ops.push(url
+      ? ['INSERT INTO event_links (event_id, url) VALUES (?, ?) ON CONFLICT (event_id) DO UPDATE SET url = excluded.url', [id, url]]
+      : ['DELETE FROM event_links WHERE event_id = ?', [id]]);
+  }
+  if (!ops.length) return true;
+  if (!env.DB) return false;
+  try {
+    await env.DB.batch(ops.map(([sql, args]) => env.DB.prepare(sql).bind(...args)));   // one transaction
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function onRequest(context) {
@@ -61,17 +115,20 @@ export async function onRequest(context) {
   const sv = validateSite(site);
   if (!sv.ok) return json({ ok: false, error: sv.error }, 400);
 
+  // From here on, `committed` is what gets rendered and committed: no private meeting links.
+  const { committed, links } = splitPrivateLinks(content);
+
   /* Render BEFORE writing anything. A document that renders to nothing means a
      block type passed validation and produced no markup — worth refusing rather
      than publishing a blank page over a working one. */
   let pages;
   try {
-    pages = renderSite(content, site);
+    pages = renderSite(committed, site);
   } catch (e) {
     return json({ ok: false, error: 'That content couldn’t be turned into pages.' }, 400);
   }
   const names = Object.keys(pages);
-  if (names.length !== content.pages.length) {
+  if (names.filter((n) => n !== 'register.html').length !== content.pages.length) {
     return json({ ok: false, error: 'Some pages could not be generated. Check every page has a valid address.' }, 400);
   }
   for (const name of names) {
@@ -98,6 +155,12 @@ export async function onRequest(context) {
         error: 'The site was changed since you opened the editor (someone else saved, or an update was published). Reload the page to get the latest, then make your change again.' }, 409);
     }
   }
+  let previousContent = null;
+  try { previousContent = previous.content ? JSON.parse(previous.content) : null; } catch {}
+  if (!(await syncRegistration(env, previousContent, committed, links))) {
+    return json({ ok: false, error: 'Couldn’t update event registration, so nothing was saved. Please try again in a moment.' }, 502);
+  }
+
   const removed = [];
   if (previous.content) {
     try {
@@ -111,14 +174,14 @@ export async function onRequest(context) {
   }
 
   const files = [
-    { path: 'content/pages.json', content: JSON.stringify(content, null, 2) + '\n' },
+    { path: 'content/pages.json', content: JSON.stringify(committed, null, 2) + '\n' },
     { path: 'content/site.json', content: JSON.stringify(site, null, 2) + '\n' },
     ...names.map((name) => ({ path: name, content: pages[name] })),
     ...removed.map((name) => ({ path: name, content: null })),
   ];
 
   const who = typeof session.sub === 'string' ? session.sub : 'an officer';
-  const summary = `Update site content (${names.length} page${names.length === 1 ? '' : 's'}` +
+  const summary = `Update site content (${content.pages.length} page${content.pages.length === 1 ? '' : 's'}` +
                   `${removed.length ? `, ${removed.length} removed` : ''})`;
   const result = await ghCommitFiles(env, files, `${summary}\n\nSaved from the site manager by ${who}.`);
 
@@ -135,7 +198,7 @@ export async function onRequest(context) {
   return json({
     ok: true,
     commit: result.commit,
-    base: await contentFingerprint(content, site),
+    base: await contentFingerprint(committed, site),
     pages: names.length,
     removed,
     note: 'Saved. The live site updates in about a minute.',

@@ -6,7 +6,7 @@ const css = `
 .wcaa-off__photo>*{width:100%;height:100%;object-fit:cover}
 .wcaa-off__init{font-family:var(--font-display);font-size:30px;color:var(--blue-800)}
 .wcaa-off__name{font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-heading)}
-.wcaa-off__role{font:600 11px/1.2 var(--font-body);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--gold-600)}
+.wcaa-off__role{font:600 11px/1.2 var(--font-body);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--gold-700)}
 .wcaa-off__contact{font-size:13px;color:var(--text-muted);margin-top:4px;display:flex;flex-direction:column;gap:2px}
 .wcaa-off__contact a{color:var(--link)}
 `;

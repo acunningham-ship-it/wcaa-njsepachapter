@@ -24,8 +24,8 @@
    it twice is a no-op rather than an error. */
 import { json, requireSession } from './_lib.js';
 
-const MIGRATIONS = ['migrations/0001_rsvps.sql'];
-const EXPECTED_TABLES = ['events', 'rsvps', 'contact_messages'];
+const MIGRATIONS = ['migrations/0001_rsvps.sql', 'migrations/0002_links_and_limits.sql'];
+const EXPECTED_TABLES = ['events', 'rsvps', 'contact_messages', 'event_links', 'rate_hits'];
 
 /* D1's exec() only handles one statement per line, and a readable migration is
    not written that way. Strip line comments, then split on semicolons — safe for

@@ -4,14 +4,17 @@
    mine   = what this officer has now
    theirs = what is on the site now (someone else saved in between)
 
-   Changes on different things are combined. Only when both changed the SAME thing differently is
-   that a conflict, and then this officer's version is kept (it's the one on her screen) and the
-   place is reported, so nothing anyone typed vanishes without a word.
+   Changes on different things are combined. When both changed the same words differently, this
+   officer's version is kept (it's the one on her screen) and the place is reported.
 
    Lists have no ids (an event, a photo, a section is just an object in an array), and a new event
    goes on TOP of the list, so merging by position would put an officer's edit on the wrong event.
    Lists are merged the way diff3/git merge lines: items unchanged on all three sides anchor the
-   list, and each stretch between anchors is taken from whichever side changed it. */
+   list, and each stretch between anchors is taken from whichever side changed it. When both
+   reshaped the same list in ways that can't be combined (one moved an event the other was editing),
+   that list is NOT merged: it is reported as a clash, holding both versions, and the officer
+   chooses (see swapList). Keeping hers without asking would silently drop the other officer's
+   changes to that list, which is the very loss this file exists to prevent. */
 
 // Compare by value, with object keys sorted, so key order never reads as a change.
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)
@@ -19,12 +22,26 @@ const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 export function merge3(base, mine, theirs) {
-  const conflicts = [];
-  const value = mergeValue(base, mine, theirs, [], conflicts);
-  return { value, conflicts };   // conflicts: paths into MINE, e.g. ['content', 'pages', 3, 'title']
+  const conflicts = [], clashes = [];
+  const value = mergeValue(base, mine, theirs, [], conflicts, clashes);
+  /* conflicts: same words changed by both; hers kept. clashes: lists that couldn't be combined;
+     hers is in `value` for now, with { path, mine, theirs } so the officer can pick. Paths point
+     into MINE, e.g. ['content', 'pages', 3, 'title']. */
+  return { value, conflicts, clashes };
 }
 
-function mergeValue(b, m, t, path, conflicts) {
+/* Puts `to` where the list `from` is in a merge result (found by identity: a clashed list is the
+   officer's own array, untouched). Returns whether it was found. */
+export function swapList(root, from, to) {
+  if (!root || typeof root !== 'object') return false;
+  for (const k of Object.keys(root)) {
+    if (root[k] === from) { root[k] = to; return true; }
+    if (swapList(root[k], from, to)) return true;
+  }
+  return false;
+}
+
+function mergeValue(b, m, t, path, conflicts, clashes) {
   const cb = canon(b), cm = canon(m), ct = canon(t);
   if (cm === ct || ct === cb) return m;
   if (cm === cb) return t;
@@ -32,12 +49,12 @@ function mergeValue(b, m, t, path, conflicts) {
     const bo = isObj(b) ? b : {};
     const out = {};
     for (const k of new Set([...Object.keys(t), ...Object.keys(m)])) {
-      const v = mergeValue(bo[k], m[k], t[k], [...path, k], conflicts);
+      const v = mergeValue(bo[k], m[k], t[k], [...path, k], conflicts, clashes);
       if (v !== undefined) out[k] = v;
     }
     return out;
   }
-  if (Array.isArray(m) && Array.isArray(t)) return mergeList(Array.isArray(b) ? b : [], m, t, path, conflicts);
+  if (Array.isArray(m) && Array.isArray(t)) return mergeList(Array.isArray(b) ? b : [], m, t, path, conflicts, clashes);
   conflicts.push(path);
   return m;
 }
@@ -55,7 +72,7 @@ function lcs(a, b) {
   return pairs;
 }
 
-function mergeList(b, m, t, path, conflicts) {
+function mergeList(b, m, t, path, conflicts, clashes) {
   const [cb, cm, ct] = [b, m, t].map((list) => list.map(canon));
   const inM = new Map(lcs(cb, cm)), inT = new Map(lcs(cb, ct));
   // Anchors: base items that survive unchanged on both sides.
@@ -67,12 +84,13 @@ function mergeList(b, m, t, path, conflicts) {
     const sb = canon(bc), sm = canon(mc), st = canon(tc);
     if (sm === sb) out.push(...tc);
     else if (st === sb || sm === st) out.push(...mc);
-    else if (bc.length === 1 && mc.length === 1 && tc.length === 1) out.push(mergeValue(bc[0], mc[0], tc[0], [...path, j], conflicts));
+    else if (bc.length === 1 && mc.length === 1 && tc.length === 1) out.push(mergeValue(bc[0], mc[0], tc[0], [...path, j], conflicts, clashes));
     else if (bc.length === 0) out.push(...mc, ...tc);   // both added things in the same spot: keep both
     else {
-      /* Both changed this stretch in different ways (say one moved a section and the other edited
-         it). Splicing the two could show the section twice, so keep this officer's whole list. */
-      conflicts.push(path);
+      /* Both changed this stretch in different ways (say one moved an event and the other edited
+         it). Splicing could show the event twice, and keeping either list drops the other
+         officer's changes to it, so this list is the officer's call. Hers stays for now. */
+      clashes.push({ path, mine: m, theirs: t });
       return m;
     }
     if (ai < b.length) out.push(m[aj]);

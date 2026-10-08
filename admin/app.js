@@ -14,7 +14,7 @@
    endpoint is right. */
 import { renderPage, pathKey, eventItems, newItemIndex } from '../js/blocks.js';
 import { validateContent, contentFingerprint } from '../js/validate-content.js';
-import { merge3 } from './merge.js';
+import { merge3, swapList } from './merge.js';
 import { FIELDS, HERO_FIELDS, ADVANCED_KEYS, BLOCK_LABELS, BLOCK_DEFAULTS, linesToText, textToLines, isSimpleLines } from './fields.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -31,6 +31,7 @@ const state = {
   links: true,         // false when private meeting links couldn't be loaded (see /api/content)
   dirty: false, saving: false, note: '', error: '', errorPath: null,
   notice: '',          // shown instead of “not saved yet” after someone else's save was merged in
+  clash: null,         // lists both officers reshaped, waiting for her to pick a version (see catchUp)
   drawer: null,        // { kind: 'item' | 'block', path } | { kind: 'hero' } | { kind: 'layout' }
 };
 
@@ -142,7 +143,7 @@ function updateStatus() {
     status.className = 'status' + (state.dirty ? ' status--dirty' : state.note ? ' status--good' : '');
     status.textContent = state.dirty ? state.notice || 'You have changes that aren’t saved yet.' : state.note || 'Everything is saved.';
   }
-  $('#save').disabled = !check.ok || !state.dirty || state.saving;
+  $('#save').disabled = !check.ok || !state.dirty || state.saving || !!state.clash;
   $('#save-top').disabled = $('#save').disabled;   // the same button, also at the top where officers look
   $('#discard').disabled = !state.dirty || state.saving;
 }
@@ -790,10 +791,11 @@ async function catchUp() {
     return;
   }
   const theirs = { content: r.content, site: r.site };
-  const { value, conflicts } = merge3(JSON.parse(state.pristine), JSON.parse(snapshot()), theirs);
-  // Name the places that clashed while state.content is still hers (conflict paths point into it).
-  const clashed = [...new Set(conflicts.map((p) => (p[0] === 'site' ? 'the menu and footer'
-    : typeof p[2] === 'number' && state.content.pages[p[2]] ? pageName(p[2]) : 'the list of pages')))];
+  const { value, conflicts, clashes } = merge3(JSON.parse(state.pristine), JSON.parse(snapshot()), theirs);
+  // Name the places while state.content is still hers (the paths point into it).
+  const page = (p) => (typeof p[2] === 'number' && state.content.pages[p[2]] ? pageName(p[2]) : null);
+  const samePlaces = [...new Set(conflicts.map((p) => (p[0] === 'site' ? 'the menu and footer' : page(p) || 'the list of pages')))];
+  const listNames = [...new Set(clashes.map(({ path }) => listName(path, page(path))))];
   const slug = curPage() && curPage().slug;
   state.content = value.content;
   state.site = value.site;
@@ -804,12 +806,55 @@ async function catchUp() {
   state.page = Math.max(0, state.content.pages.findIndex((p) => p.slug === slug));
   state.drawer = null;                        // an open item may have moved (a new event goes on top)
   state.error = '';
-  state.notice = 'Someone else saved while you were editing. Your changes are still here, added to theirs. ' +
-    (clashed.length ? `You both changed the same thing on ${clashed.join(', ')}; your version is the one shown. ` : '') +
+  const same = samePlaces.length ? `You both changed the same words on ${samePlaces.join(', ')}; your version is the one shown. ` : '';
+  state.notice = 'Someone else saved while you were editing. Your changes are still here, added to theirs. ' + same +
     'Check the page, then press Save.';
   fillPageSelect();
   renderDrawer();
   renderPreview();
+  if (clashes.length) askWhichList(clashes, listNames.join(' and '), same);
+}
+
+/* What a clashed list is, in words: "the events on the Events page". */
+function listName(path, page) {
+  if (path[0] === 'site') return 'the menu and footer';
+  if (!page) return 'the list of pages';
+  const last = path[path.length - 1];
+  const block = path.slice(0, -1).reduce((o, k) => (o == null ? o : o[k]), { content: state.content, site: state.site });
+  if (last === 'items' && block && NOUN[block.type]) return `the ${NOUN[block.type]}s on the ${page} page`;
+  if (last === 'sections') return `the sections on the ${page} page`;
+  return `a list on the ${page} page`;
+}
+
+/* Both officers reshaped the same list (say one moved an event the other was editing). Those can't
+   be combined, and keeping either one silently drops the other's changes to it, so she chooses,
+   with what each choice costs written on the button. Save stays off until she has. */
+function askWhichList(clashes, where, same) {
+  state.clash = clashes;
+  updateStatus();
+  const dlg = $('#clash');
+  $('#clash-text').textContent = `While you were editing, someone else also changed ${where}, in a way that can’t be combined with your changes to it. Which version of ${where} should the website keep? Everything else you changed is kept either way.`;
+  const pick = (mine) => {
+    if (!mine) {
+      const root = { content: state.content, site: state.site };
+      for (const c of [...clashes].reverse()) swapList(root, c.mine, c.theirs);   // outer lists first
+      state.content = root.content;
+      state.site = root.site;
+    }
+    state.clash = null;
+    state.dirty = snapshot() !== state.pristine;
+    state.notice = (mine
+      ? `Your version of ${where} is kept. When you press Save it replaces their changes to it. `
+      : `Their version of ${where} is in place. `) +
+      'Everything else you changed is still here, added to theirs. ' + same + 'Check the page, then press Save.';
+    dlg.close();
+    renderPreview();
+    updateStatus();
+  };
+  $('#clash-mine').onclick = () => pick(true);
+  $('#clash-theirs').onclick = () => pick(false);
+  dlg.oncancel = (e) => e.preventDefault();   // Esc doesn't dodge the choice
+  dlg.showModal();
 }
 
 /* ---------- sign in ---------- */

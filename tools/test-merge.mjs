@@ -6,7 +6,7 @@
    event. A merge by list position puts the second officer's edit on the wrong event and publishes
    it without a word, which is worse than refusing the save. */
 import { readFileSync } from 'node:fs';
-import { merge3 } from '../admin/merge.js';
+import { merge3, swapList } from '../admin/merge.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail) => {
@@ -101,23 +101,58 @@ const NEW = (title) => ({ month: 'Dec', day: '9', title, time: '6 PM', location:
   ok('we both changed the same words: mine is kept', events(r.value)[1].description === 'My words.');
   ok('...and it is reported, pointing at that page', r.conflicts.length === 1 && r.conflicts[0][0] === 'content' && r.conflicts[0][1] === 'pages' && r.conflicts[0][2] === pageIx, r.conflicts);
 
+  ok('...and a same-words conflict is not treated as a list clash', (r.clashes || []).length === 0);
+}
+
+/* ---------- lists both officers reshaped: never silently dropped (judge #10406) ----------
+   The bug 6656416 shipped with: on a clash it kept her whole list without asking, so the other
+   officer's OTHER changes to that list vanished when she saved. Now the list is reported as a
+   clash holding both versions, and the officer chooses. The test that matters is that THEIR
+   changes are still reachable, not merely that nothing appears twice. */
+const clashCase = (name, theirs, mine, listOf, check) => {
+  const r = merge3(BASE, mine, theirs);
+  const clashes = r.clashes || [];
+  const c = clashes.find((x) => x.mine === listOf(mine));
+  ok(name + ': reported as a clash on that list, not resolved behind her back', clashes.length === 1 && !!c, clashes.map((x) => x.path));
+  if (!c) return;
+  ok(name + ': the clash holds THEIR whole list untouched (their other changes can still be kept)', eq(c.theirs, listOf(theirs)));
+  ok(name + ': ...and HER whole list untouched', eq(c.mine, listOf(mine)));
+  const kept = swapList(r.value, c.mine, c.theirs);   // what "Use their version" does
+  ok(name + ': choosing theirs puts their exact list in place', kept && eq(listOf(r.value), listOf(theirs)) && check(r.value), listOf(r.value));
+};
+{
+  // The case from the bug report: they add an event on top AND move event 2 down; I edit event 2.
+  const NEWEV = NEW('Their new event');
+  const theirs = clone(BASE); events(theirs).unshift(NEWEV); events(theirs).splice(3, 0, events(theirs).splice(2, 1)[0]);
+  const mine = clone(BASE); events(mine)[1].description = 'I was editing this one.';
+  clashCase('they added an event + moved the one I edited', theirs, mine, events,
+            (v) => events(v)[0].title === 'Their new event');
+  const r = merge3(BASE, mine, theirs);
+  // The invariant, said plainly: their new event is either in the result, or in a reported clash.
+  ok('NEVER SILENT: their new event is in the result or in a reported clash',
+     events(r.value).some((e) => e.title === 'Their new event') || (r.clashes || []).some((c) => JSON.stringify(c.theirs).includes('Their new event')));
+
   const t2 = clone(BASE); events(t2).splice(1, 1);
   const m2 = clone(BASE); events(m2)[1].description = 'I was editing this one.';
-  r = merge3(BASE, m2, t2);
-  ok('they deleted the event I was editing: my edit survives (reported), nothing silently lost',
-     events(r.value).some((e) => e.description === 'I was editing this one.') && r.conflicts.length === 1, r.conflicts);
+  clashCase('they deleted the event I was editing', t2, m2, events, (v) => events(v).length === n - 1);
+  const r2 = merge3(BASE, m2, t2);
+  ok('...and until she chooses, her edit is still on her screen', events(r2.value).some((e) => e.description === 'I was editing this one.'));
 
-  // They moved a section, I edited that same section: splicing could show it twice.
+  // They moved a section, I edited that same section: splicing would show it twice.
   const px = BASE.content.pages.reduce((best, p, i, all) => (p.sections.length > all[best].sections.length ? i : best), 0);
   const secs = (doc) => doc.content.pages[px].sections;
   ok('fixture: some page has 3+ sections to move', secs(BASE).length >= 3);
-  {
-    const t3 = clone(BASE); secs(t3).push(secs(t3).shift());
-    const m3 = clone(BASE); secs(m3)[0].tint = !secs(m3)[0].tint;
-    r = merge3(BASE, m3, t3);
-    const firsts = secs(r.value).filter((s) => JSON.stringify(s.blocks) === JSON.stringify(secs(BASE)[0].blocks)).length;
-    ok('they moved a section I edited: no section appears twice (my list kept, reported)', firsts === 1 && secs(r.value).length === secs(BASE).length && r.conflicts.length >= 1, { firsts, conflicts: r.conflicts });
-  }
+  const t3 = clone(BASE); secs(t3).push(secs(t3).shift());
+  const m3 = clone(BASE); secs(m3)[0].tint = !secs(m3)[0].tint;
+  clashCase('they moved a section I edited', t3, m3, secs, () => true);
+  const r3 = merge3(BASE, m3, t3);
+  const firsts = secs(r3.value).filter((x) => JSON.stringify(x.blocks) === JSON.stringify(secs(BASE)[0].blocks)).length;
+  ok('...and no section appears twice meanwhile', firsts === 1 && secs(r3.value).length === secs(BASE).length, firsts);
+
+  // A clash in one list must not stop the rest from combining.
+  const t4 = clone(t2); t4.content.pages[0].hero.title = 'Their home title';
+  const r4 = merge3(BASE, m2, t4);
+  ok('a clash on the events list still lets their change on another page through', r4.value.content.pages[0].hero.title === 'Their home title' && (r4.clashes || []).length === 1);
 }
 
 /* ---------- a broad sweep: one-sided changes always come through untouched ---------- */

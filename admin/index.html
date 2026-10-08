@@ -74,6 +74,16 @@
     </div>
   </footer>
 
+  <!-- Someone else saved and both of you reshaped the same list: she picks which to keep (app.js askWhichList). -->
+  <dialog class="clash" id="clash" aria-labelledby="clash-title">
+    <h2 id="clash-title" tabindex="-1" autofocus>Someone else changed the same list</h2>   <!-- focus here, so a stray Enter picks neither -->
+    <p id="clash-text"></p>
+    <div class="clash-actions">
+      <button class="btn btn--quiet" id="clash-theirs" type="button">Use their version<small>Your changes to it are dropped</small></button>
+      <button class="btn btn--primary" id="clash-mine" type="button">Keep my version<small>It replaces their changes to it</small></button>
+    </div>
+  </dialog>
+
   <!-- Who registered for what. Lives in the database, never in the website's files. -->
   <main class="events-view" id="events-view" hidden></main>
 </div>

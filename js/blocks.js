@@ -311,6 +311,9 @@ const BLOCKS = {
           (e.description ? '<p class="wcaa-ev__desc"' + F(ie, 'description') + '>' + esc(e.description) + '</p>' : '') +
           (href ? '<a class="wcaa-ev__link" href="' + attr(href) + '">' + esc(e.linkLabel || 'Event Details') + ' →</a>' : '') +
           (reg || join ? '<div class="wcaa-ev__actions">' + reg + join + '</div>' : '') +
+          /* Who's going: an EMPTY slot that js/going.js fills from /api/attendees when the page
+             is viewed. Names never enter this markup: it is committed to a public repo. */
+          (reg ? '<p class="wcaa-ev__going" data-going="' + attr(e.id) + '" hidden></p>' : '') +
           '</div></article>'
         );
       })
@@ -730,7 +733,7 @@ export const CANONICAL_REDIRECT = [
 ].join('\n') + '\n';
 
 /* The document shell every generated page shares. */
-function documentFor(site, { title, navHref, hasForm, hero, body }) {
+function documentFor(site, { title, navHref, hasForm, hasGoing, hero, body }) {
   return (
     '<!DOCTYPE html>\n' +
     '<html lang="en">\n<head>\n' +
@@ -748,6 +751,9 @@ function documentFor(site, { title, navHref, hasForm, hero, body }) {
       ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>\n' +
         '<script src="js/forms.js" defer></script>\n'
       : '') +
+    /* ...and the who's-going script ONLY on a page with an event people can register for.
+       Without it nothing is shown, which is the safe way to fail. */
+    (hasGoing ? '<script src="js/going.js" defer></script>\n' : '') +
     CANONICAL_REDIRECT +
     '</head>\n<body>\n' +
     renderNav(site, navHref) +
@@ -762,13 +768,15 @@ function documentFor(site, { title, navHref, hasForm, hero, body }) {
    no timestamps, no random ids, no Date. tools/test-pages.mjs asserts it. */
 export function renderPage(page, site, opts) {
   const edit = !!(opts && opts.edit);
+  const body = Array.isArray(page.sections)
+    ? page.sections.map((s, i) => renderSection(s, site, edit ? editor(i, []) : null)).join('') : '';
   return documentFor(site, {
     title: page.title || site.title,
     navHref: page.navHref,
     hasForm: pageHasForm(page),
+    hasGoing: !edit && body.includes(' data-going="'),
     hero: renderHero(page.hero, edit ? { base: 'hero' } : null),
-    body: Array.isArray(page.sections)
-      ? page.sections.map((s, i) => renderSection(s, site, edit ? editor(i, []) : null)).join('') : '',
+    body,
   });
 }
 
@@ -836,8 +844,13 @@ export function renderRegisterPage(content, site) {
     field('reg-name', 'Your name', 'name', 'text', ' autocomplete="name" autocapitalize="words" required') +
     field('reg-email', 'Email', 'email', 'email', ' autocomplete="email" inputmode="email" required') +
     field('reg-phone', 'Phone <span class="wcaa-reg__opt">(optional)</span>', 'phone', 'tel', ' autocomplete="tel" inputmode="tel"') +
+    /* Unticked unless the person ticks it (functions/api/rsvp.js treats anything else as no). */
+    '<label class="wcaa-reg__check" for="reg-list"><input id="reg-list" name="list_name" type="checkbox" value="on">' +
+    '<span>Show my first name and last initial on the events page, so other members can see who’s going ' +
+    'and share rides. <span class="wcaa-reg__opt">(optional)</span></span></label>' +
     HONEYPOT +
-    '<p class="wcaa-reg__notice">Your information goes only to the WCAA NJ/SE-PA chapter for this event.</p>' +
+    '<p class="wcaa-reg__notice">Your email and phone go only to the WCAA NJ/SE-PA chapter for this event. ' +
+    'Your name appears on the events page only if you tick the box above.</p>' +
     turnstileWidget(site) +
     '<button class="wcaa-btn wcaa-btn--primary wcaa-btn--lg wcaa-btn--full" type="submit">Register</button>' +
     '<p class="wcaa-form__msg" role="alert" hidden></p>' +

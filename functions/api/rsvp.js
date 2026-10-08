@@ -1,6 +1,6 @@
 /* POST /api/rsvp — PUBLIC. Anyone on the internet can reach this.
    Body (JSON or form-encoded): { event_id, name, email, phone?, business?,
-                                  guests?, notes?, "cf-turnstile-response" }
+                                  guests?, notes?, list_name?, "cf-turnstile-response" }
 
    ⛔ THIS ENDPOINT MAKES ZERO GITHUB CALLS, AND THAT IS A REQUIREMENT, NOT AN
    IMPLEMENTATION DETAIL. Every other write path on this site commits to a PUBLIC
@@ -50,6 +50,10 @@ export async function onRequest(context) {
   });
   if (!v.ok) return json({ ok: false, error: v.error }, 400);
   const f = v.values;
+  /* "List my first name + last initial on the events page" (migration 0003). ON only when the
+     box was ticked: a ticked checkbox posts "on", an unticked one posts nothing at all. Anything
+     else, a missing field included, is OFF, so an old form, a script or a typo never lists anyone. */
+  const listed = [true, 'on', '1', 'true'].includes(body.list_name);
 
   /* Read the event first, only so the refusal can say WHICH thing is wrong. The
      authoritative check is in the INSERT below — see the note there. */
@@ -62,6 +66,17 @@ export async function onRequest(context) {
   }
   if (!event) return json({ ok: false, error: 'Registration for that event isn’t open.' }, 404);
   if (event.closed) return json({ ok: false, error: 'Registration for this event is closed.' }, 409);
+
+  /* Not ticked: take them OFF the list before anything else, so someone who signed up again to
+     un-list themselves is never left showing. If that can't be confirmed, refuse the whole thing
+     and let them retry, except when the table doesn't exist yet (then nobody is listed anyway). */
+  if (!listed) {
+    try {
+      await env.DB.prepare('DELETE FROM rsvp_listed WHERE event_id = ? AND email_key = ?').bind(f.event_id, f.email_key).run();
+    } catch (e) {
+      if (!/no such table/i.test(String(e && e.message))) return json({ ok: false, error: GENERIC }, 500);
+    }
+  }
 
   /* One statement, so the capacity check and the insert cannot be separated by
      another request. A SELECT-then-INSERT would let two people racing for the last
@@ -100,6 +115,14 @@ export async function onRequest(context) {
       error: 'This event is full. Please contact the chapter — we’ll add you to the waiting list.',
       full: true,
     }, 409);
+  }
+
+  /* Ticked: list them, now that the sign-up exists (the row points at it). If this fails they
+     are registered but not listed, which is the safe way round. */
+  if (listed) {
+    try {
+      await env.DB.prepare('INSERT OR IGNORE INTO rsvp_listed (event_id, email_key) VALUES (?, ?)').bind(f.event_id, f.email_key).run();
+    } catch { /* migration 0003 not applied yet */ }
   }
 
   /* The meeting link goes to the person who just registered, and only to them (see migration

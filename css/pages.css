@@ -116,6 +116,12 @@
 .wcaa-reg__field .wcaa-field__label { font-size: 18px; }
 .wcaa-reg__field .wcaa-field__input { font-size: 18px; min-height: 52px; padding: 12px 14px; box-sizing: border-box; }
 .wcaa-reg__opt { font-weight: 400; color: var(--text-muted); }
+/* "Show my name" opt-in: the whole sentence is the click target, with a 24px box. */
+.wcaa-reg__check { align-self: stretch; display: flex; gap: 12px; align-items: flex-start; font-size: 18px; line-height: 1.5; color: var(--text-body); cursor: pointer; }
+.wcaa-reg__check input { flex: none; width: 24px; height: 24px; margin: 2px 0 0; accent-color: var(--blue-800); cursor: pointer; }
+/* Who's going, under an event's Register button (js/going.js fills it). */
+.wcaa-ev__going { margin: 12px 0 0; font-size: 18px; line-height: 1.5; color: var(--text-body); }
+.wcaa-ev__going[hidden] { display: none; }
 .wcaa-reg__url { word-break: break-all; font-weight: 600; color: var(--text-heading); }
 .wcaa-reg .wcaa-form__msg { font-size: 18px; }
 @media (max-width: 600px) { .wcaa-reg__panel { padding: var(--space-6) var(--space-5); } }

@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { renderSite, renderPage, renderBlocks, renderRegisterPage, CANONICAL_REDIRECT } from '../js/blocks.js';
+import { renderSite, renderPage, renderBlocks, renderRegisterPage, registerableEvents, CANONICAL_REDIRECT } from '../js/blocks.js';
 
 /* The canonical redirect is the ONE inline script the renderer emits, on every page, by design
    (see js/blocks.js). Script checks below run on the page MINUS that exact byte-string, so any
@@ -161,7 +161,7 @@ const content = JSON.parse(read('content/pages.json'));
     const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
     ok('the payload introduced no script',
        scripts.every((m) => m[2].trim() === '') &&
-       srcs.every((u) => u === 'js/forms.js' || u === 'https://challenges.cloudflare.com/turnstile/v0/api.js'),
+       srcs.every((u) => u === 'js/forms.js' || u === 'js/going.js' || u === 'https://challenges.cloudflare.com/turnstile/v0/api.js'),
        { srcs, inline: scripts.map((m) => m[2].slice(0, 30)) });
   }
   ok('the payload never becomes real markup', html.indexOf('<img src=x') === -1);
@@ -237,6 +237,18 @@ const content = JSON.parse(read('content/pages.json'));
      (p['404.html'].match(/class="wcaa-nav__link"/g) || []).length === site.nav.length,
      { found: (p['404.html'].match(/class="wcaa-nav__link"/g) || []).length, expected: site.nav.length });
 
+  /* Who's going: each event you can register for gets an EMPTY, hidden slot that js/going.js
+     fills at view time. Names must never be in the generated page (it is committed, publicly). */
+  {
+    const ev = p['events.html'];
+    const slots = [...ev.matchAll(/<p class="wcaa-ev__going" data-going="([^"]*)" hidden><\/p>/g)].map((m) => m[1]);
+    const ids = Object.keys(registerableEvents(content));
+    ok(`events.html has one empty who’s-going slot per event taking registrations (${ids.length})`,
+       ids.length > 0 && JSON.stringify(slots.slice().sort()) === JSON.stringify(ids.slice().sort()), { slots, ids });
+    ok('...and no slot anywhere carries text', (ev.match(/data-going=/g) || []).length === slots.length);
+    ok('the editor preview does not load the who’s-going script',
+       !renderPage(content.pages.find((pg) => pg.slug === 'events'), site, { edit: true }).includes('js/going.js'));
+  }
   const navHrefs = site.nav.map((l) => l.href);
   /* The two allowed scripts, and only on a page that carries a form. Turnstile
      needs JavaScript, so a bot-gated form has no JS-free path — but that is no
@@ -247,6 +259,9 @@ const content = JSON.parse(read('content/pages.json'));
     'https://challenges.cloudflare.com/turnstile/v0/api.js',
     'js/forms.js',
   ];
+  /* ...plus js/going.js, and ONLY on a page with an event people can register for (it fills
+     that card's "who's going" slot from /api/attendees). */
+  const GOING_SRC = 'js/going.js';
   for (const [name, full] of Object.entries(p)) {
     const head = full.slice(0, full.indexOf('</head>'));
     ok(`${name} carries the canonical redirect exactly once, in <head>`,
@@ -264,12 +279,16 @@ const content = JSON.parse(read('content/pages.json'));
     ok(`${name} carries ${name === 'register.html' ? 'exactly one JSON data block' : 'no JSON data block'}`,
        data.length === (name === 'register.html' ? 1 : 0), data.length);
     const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
-    ok(`${name} loads only permitted scripts`, srcs.every((u) => ALLOWED_SRC.includes(u)), srcs);
+    const hasGoing = html.includes(' data-going="');
+    ok(`${name} loads only permitted scripts`, srcs.every((u) => ALLOWED_SRC.includes(u) || (hasGoing && u === GOING_SRC)), srcs);
+    ok(`${name} loads the who's-going script exactly when it has a who's-going slot`,
+       srcs.includes(GOING_SRC) === hasGoing && srcs.filter((u) => u === GOING_SRC).length <= 1, { hasGoing, srcs });
     if (hasForm) {
       ok(`${name} has a form, so it loads both form scripts`,
          ALLOWED_SRC.every((u) => srcs.includes(u)), srcs);
     } else {
-      ok(`${name} has no form, so it ships NO script at all`, scripts.length === 0, srcs);
+      ok(`${name} has no form, so it ships no FORM script`, !srcs.some((u) => ALLOWED_SRC.includes(u)), srcs);
+      if (!hasGoing) ok(`${name} has no form and no event to register for, so it ships NO script at all`, scripts.length === 0, srcs);
     }
     /* A page highlights its own nav link, and only pages that ARE in the nav can.
        join.html and 404.html are reachable but not nav entries, so zero is right
@@ -365,7 +384,14 @@ const content = JSON.parse(read('content/pages.json'));
      /name="name" type="text" autocomplete="name"/.test(two) && /name="email" type="email" autocomplete="email" inputmode="email" required/.test(two) &&
      /name="phone" type="tel" autocomplete="tel" inputmode="tel"/.test(two) && (two.match(/class="wcaa-field__input"/g) || []).length === 3);
   ok('register.html carries the honeypot and the privacy notice',
-     two.includes('name="website" tabindex="-1"') && two.includes('Your information goes only to the WCAA NJ/SE-PA chapter for this event.'));
+     two.includes('name="website" tabindex="-1"') && two.includes('Your email and phone go only to the WCAA NJ/SE-PA chapter for this event. ' +
+       'Your name appears on the events page only if you tick the box above.'));
+  /* Being listed on the events page is OPT-IN (Armani-approved 2026-10-08): the box exists, and it
+     is not ticked until the person ticks it. */
+  const optin = (two.match(/<input[^>]*name="list_name"[^>]*>/) || [''])[0];
+  ok('register.html offers the “show my name” checkbox', /type="checkbox"/.test(optin) && /value="on"/.test(optin), optin);
+  ok('...and it starts UNTICKED', optin !== '' && !/\bchecked\b/i.test(optin), optin);
+  ok('...and its wording says exactly what is shown', two.includes('Show my first name and last initial on the events page'));
   ok('register.html’s “back” goes to the Events page when there is one, else home',
      two.includes('href="events.html">Back to the events</a>') &&
      reg([{ title: 'T', register: true, id: 't' }], [{ slug: 'index', sections: [{ blocks: [{ type: 'events', items: [{ title: 'T', register: true, id: 't' }] }] }] }]).includes('href="index.html">Back to the events</a>'));

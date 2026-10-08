@@ -14,6 +14,7 @@
    endpoint is right. */
 import { renderPage, pathKey, eventItems, newItemIndex } from '../js/blocks.js';
 import { validateContent, contentFingerprint } from '../js/validate-content.js';
+import { merge3 } from './merge.js';
 import { FIELDS, HERO_FIELDS, ADVANCED_KEYS, BLOCK_LABELS, BLOCK_DEFAULTS, linesToText, textToLines, isSimpleLines } from './fields.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -29,6 +30,7 @@ const state = {
   base: null,          // fingerprint of the stored content, for /api/save's stale-editor check
   links: true,         // false when private meeting links couldn't be loaded (see /api/content)
   dirty: false, saving: false, note: '', error: '', errorPath: null,
+  notice: '',          // shown instead of “not saved yet” after someone else's save was merged in
   drawer: null,        // { kind: 'item' | 'block', path } | { kind: 'hero' } | { kind: 'layout' }
 };
 
@@ -138,7 +140,7 @@ function updateStatus() {
     status.textContent = state.error;
   } else {
     status.className = 'status' + (state.dirty ? ' status--dirty' : state.note ? ' status--good' : '');
-    status.textContent = state.dirty ? 'You have changes that aren’t saved yet.' : state.note || 'Everything is saved.';
+    status.textContent = state.dirty ? state.notice || 'You have changes that aren’t saved yet.' : state.note || 'Everything is saved.';
   }
   $('#save').disabled = !check.ok || !state.dirty || state.saving;
   $('#save-top').disabled = $('#save').disabled;   // the same button, also at the top where officers look
@@ -746,10 +748,12 @@ async function saveSite() {
     });
     const body = await res.json().catch(() => ({}));
     if (res.status === 401) { showSignIn(); return; }
+    if (res.status === 409) { await catchUp(); return; }
     if (!res.ok || !body.ok) throw new Error(body.error || 'Saving didn’t work. Please try again.');
     if (body.base) state.base = body.base;   // what the site now holds, so the next save passes
     state.pristine = snapshot();
     state.dirty = false;
+    state.notice = '';
     state.note = 'Saved. The website shows your changes in about a minute.';
   } catch (e) {
     state.error = e.message;
@@ -762,6 +766,7 @@ async function saveSite() {
 
 function discard() {
   if (!confirm('Throw away the changes you haven’t saved? The page goes back to how it was at the last save.')) return;
+  state.notice = '';
   const p = JSON.parse(state.pristine);
   state.content = p.content;
   state.site = p.site;
@@ -770,6 +775,41 @@ function discard() {
   fillPageSelect();
   renderDrawer();
   changed({ now: true });
+}
+
+/* ---------- someone else saved while this officer was editing ----------
+   /api/save refuses (409) rather than overwrite their work. Before, the message said to reload and
+   make the change again, and reloading threw the change away. Now: fetch what's on the site, put
+   this officer's changes on top of it (admin/merge.js), and leave the result unsaved so she sees
+   it and presses Save. Where both changed the same thing, hers is kept and the page is named. */
+async function catchUp() {
+  let r = null;
+  try { r = await fetch('../api/content', { cache: 'no-store' }).then((x) => x.json()); } catch {}
+  if (!r || !r.ok) {
+    state.error = 'Someone else saved while you were editing, and their version couldn’t be loaded just now. Your changes are still here. Please press Save again in a moment.';
+    return;
+  }
+  const theirs = { content: r.content, site: r.site };
+  const { value, conflicts } = merge3(JSON.parse(state.pristine), JSON.parse(snapshot()), theirs);
+  // Name the places that clashed while state.content is still hers (conflict paths point into it).
+  const clashed = [...new Set(conflicts.map((p) => (p[0] === 'site' ? 'the menu and footer'
+    : typeof p[2] === 'number' && state.content.pages[p[2]] ? pageName(p[2]) : 'the list of pages')))];
+  const slug = curPage() && curPage().slug;
+  state.content = value.content;
+  state.site = value.site;
+  state.base = typeof r.base === 'string' ? r.base : await contentFingerprint(r.content, r.site);
+  state.links = r.links !== false;
+  state.pristine = JSON.stringify(theirs);   // what's on the site now: Discard goes back to THEIR version
+  state.dirty = snapshot() !== state.pristine;
+  state.page = Math.max(0, state.content.pages.findIndex((p) => p.slug === slug));
+  state.drawer = null;                        // an open item may have moved (a new event goes on top)
+  state.error = '';
+  state.notice = 'Someone else saved while you were editing. Your changes are still here, added to theirs. ' +
+    (clashed.length ? `You both changed the same thing on ${clashed.join(', ')}; your version is the one shown. ` : '') +
+    'Check the page, then press Save.';
+  fillPageSelect();
+  renderDrawer();
+  renderPreview();
 }
 
 /* ---------- sign in ---------- */

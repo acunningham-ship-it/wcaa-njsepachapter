@@ -12,7 +12,7 @@
    the person using it. The real validation is functions/api/save.js, which does
    not trust a single byte of what this sends. If the two ever disagree, the
    endpoint is right. */
-import { renderPage, pathKey, eventItems } from '../js/blocks.js';
+import { renderPage, pathKey, eventItems, newItemIndex } from '../js/blocks.js';
 import { validateContent, contentFingerprint } from '../js/validate-content.js';
 import { FIELDS, HERO_FIELDS, ADVANCED_KEYS, BLOCK_LABELS, BLOCK_DEFAULTS, linesToText, textToLines, isSimpleLines } from './fields.js';
 
@@ -302,9 +302,14 @@ function addItem(listPath) {
   const page = curPage();
   const block = getAt(page, parentOf(listPath));
   if (!block || !NOUN[block.type]) return;
+  // Drop a blank entry left open BEFORE inserting: inserting on top would shift it, and
+  // openDrawer's prune would then remove the new entry instead of the blank one.
+  pruneBlankItem();
+  state.drawer = null;
   block.items = Array.isArray(block.items) ? block.items : [];
-  block.items.push(ITEM_DEFAULT[block.type]());
-  openDrawer({ kind: 'item', path: listPath + '.' + (block.items.length - 1) }, { focus: true });
+  const at = newItemIndex(block.type, block.items.length);
+  block.items.splice(at, 0, ITEM_DEFAULT[block.type]());
+  openDrawer({ kind: 'item', path: listPath + '.' + at }, { focus: true });
   changed({ now: true });
 }
 

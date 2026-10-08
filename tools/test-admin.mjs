@@ -11,7 +11,7 @@
  * a row in the outline and nothing on the page, which reads as the CMS being
  * broken.
  */
-import { BLOCK_TYPES, renderBlocks } from '../js/blocks.js';
+import { BLOCK_TYPES, renderBlocks, renderPage, newItemIndex } from '../js/blocks.js';
 import { validateContent } from '../js/validate-content.js';
 import { FIELDS, BLOCK_LABELS, BLOCK_DEFAULTS, linesToText, textToLines, isSimpleLines } from '../admin/fields.js';
 
@@ -164,6 +164,21 @@ const ok = (name, cond, detail) => {
   const evFields = FIELDS.events.find((f) => f.kind === 'items').fields.map((f) => f.key);
   ok('the event form offers registration, the meeting link and “show to everyone”',
      ['register', 'meetingLink', 'meetingPublic'].every((k) => evFields.includes(k)), evFields);
+}
+
+/* ---------- a new event goes on top (officer request 2026-10-07) ---------- */
+{
+  ok('a new event is added at the top of the list', newItemIndex('events', 6) === 0 && newItemIndex('events', 0) === 0);
+  ok('every other list still grows at the end', ['cards', 'gallery', 'officers', 'list', 'buttons'].every((t) => newItemIndex(t, 3) === 3));
+  const page = { slug: 't', navHref: 't.html', title: 'T', hero: { title: 'T' }, sections: [{ blocks: [
+    { type: 'events', items: [{ month: 'Oct', day: '15', title: 'Newer' }, { month: 'Jun', day: '18', title: 'Older' }] },
+    { type: 'cards', items: [{ title: 'Card one' }] }] }] };
+  const html = renderPage(page, {}, { edit: true });
+  const at = (s) => html.indexOf(s);
+  ok('the editor shows “+ Add an event” ABOVE the events, where the new one will appear',
+     at('+ Add an event') > -1 && at('+ Add an event') < at('class="wcaa-ev'), [at('+ Add an event'), at('class="wcaa-ev')]);
+  ok('...and “+ Add a card” stays below its cards', at('+ Add a card') > at('Card one'), [at('+ Add a card'), at('Card one')]);
+  ok('the public page has no Add buttons at all', !renderPage(page, {}).includes('wcaa-edit-add'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

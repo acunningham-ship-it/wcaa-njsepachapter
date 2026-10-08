@@ -547,12 +547,13 @@ export function renderBlocks(list, site, ed) {
       const path = ed.at(i);
       const base = pathKey(path);
       const html = fn ? fn(b, site, Object.assign({ base }, ed.child(i))) : '';
-      /* A visible "+ Add an event" under every list block: adding must not depend on hovering
-         (older officers, touch screens), and an empty list gets the same affordance below. */
+      /* A visible "+ Add an event" on every list block: adding must not depend on hovering
+         (older officers, touch screens), and an empty list gets the same affordance below.
+         It sits where the new entry will land: above the events, below every other list. */
       const add = html && ADD_NOUN[b.type]
         ? '<button type="button" class="wcaa-edit-add" data-add="' + attr(base + '.items') + '">+ Add ' + ADD_NOUN[b.type] + '</button>'
         : '';
-      return editWrap(path, html + add, b, base);
+      return editWrap(path, ADD_ON_TOP.has(b.type) ? add + html : html + add, b, base);
     })
     .filter(Boolean)
     .join('');
@@ -572,6 +573,12 @@ const EMPTY_TEXT = {
 
 const ADD_NOUN = { events: 'an event', cards: 'a card', gallery: 'a photo', officers: 'an officer',
                    list: 'a point', buttons: 'a button' };
+
+/* Where "Add" puts a new entry. The events page reads newest first, so a new event goes on top
+   (and its Add button sits above the list, where the event will appear); every other list grows
+   at the end. Officer request 2026-10-07: "newest events post to the top and not the bottom". */
+const ADD_ON_TOP = new Set(['events']);
+export const newItemIndex = (type, length) => (ADD_ON_TOP.has(type) ? 0 : length);
 
 /* { section: 1, chain: [{ index: 0, key: 'left' }, { index: 2, key: 'blocks' }] }
    -> "sections.1.blocks.0.left.2" — the same walk admin/app.js containerAt/blockAt do. */

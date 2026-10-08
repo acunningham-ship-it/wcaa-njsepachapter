@@ -18,7 +18,7 @@
  *      actually CALL them, by pushing payloads through every officer-editable
  *      field of every block type and asserting the page comes out inert.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
@@ -548,6 +548,21 @@ const content = JSON.parse(read('content/pages.json'));
   ok('an event’s title, date, time, place and description are each typeable',
      ['title', 'month', 'day', 'time', 'location', 'description'].every((k) => new RegExp('data-f="sections\\.\\d+\\.blocks\\.\\d+\\.items\\.0\\.' + k + '"').test(events)));
   ok('the hero is clickable and its title typeable in the editor', home.includes(' data-hero') && home.includes('data-f="hero.title"'));
+}
+
+/* ---------- log out lives in the editor only ----------
+   Members never sign in, so nothing they load may carry a log-out control or touch the session.
+   Checks what is actually served (the committed pages + the scripts they load), not just a fresh
+   render, and pairs it with a presence check on the editor so a broken pattern can't pass on zero. */
+{
+  const LOGOUT = /api\/logout|id="logout"|wcaa_session/;
+  const served = [...readdirSync(ROOT).filter((f) => f.endsWith('.html')), ...readdirSync(join(ROOT, 'js')).map((f) => 'js/' + f)];
+  const leaking = served.filter((f) => LOGOUT.test(read(f)));
+  const rendered = Object.entries(renderSite(content, site)).filter(([, h]) => LOGOUT.test(h)).map(([n]) => n);
+  ok(`no public page or script has a log-out control or touches the session (${served.length} files)`,
+     served.length > 10 && leaking.length === 0 && rendered.length === 0, [...leaking, ...rendered]);
+  ok('the editor does have one (control: the pattern can match)',
+     LOGOUT.test(read('admin/index.html')) && LOGOUT.test(read('admin/app.js')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

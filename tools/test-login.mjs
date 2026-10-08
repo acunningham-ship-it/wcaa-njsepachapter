@@ -87,5 +87,35 @@ ok('uppercase ADMIN_PASSWORD_HASH still verifies', r.status === 200);
      res.status === 405 && !res.headers.get('Set-Cookie'));
 }
 
+/* ---------- log out (officer request 2026-10-07: "how do I log out of the editor?") ----------
+   The clearing cookie must hit the SAME cookie login set: same name, same Path. A mismatch on
+   either leaves the real session in place while the button looks like it worked. */
+{
+  const { onRequest: logout } = await import('../functions/api/logout.js');
+  const { requireSession } = await import('../functions/api/_lib.js');
+  const attrs = (c) => Object.fromEntries((c || '').split(/;\s*/).map((p) => { const i = p.indexOf('=');
+    return i < 0 ? [p.toLowerCase(), true] : [p.slice(0, i).toLowerCase(), p.slice(i + 1)]; }));
+  const signedIn = await call({ username: 'Denise', password: PASSWORD }, env);
+  const loginName = signedIn.cookie.split('=')[0];
+  const loginAttrs = attrs(signedIn.cookie);
+  const sessionCookie = signedIn.cookie.split(';')[0];
+  const asked = (cookie) => requireSession({ request: new Request('https://example.test/api/save', { headers: cookie ? { cookie } : {} }), env });
+  ok('a signed-in browser has a working session (control)', !!(await asked(sessionCookie)));
+
+  const res = await logout({ request: new Request('https://example.test/api/logout', { method: 'POST', headers: { cookie: sessionCookie } }) });
+  const cleared = res.headers.get('Set-Cookie') || '';
+  const c = attrs(cleared);
+  ok('log out answers 200 ok', res.status === 200 && (await res.json()).ok === true);
+  ok('...and clears the SAME cookie login set (same name, same Path)', cleared.split('=')[0] === loginName && c.path === loginAttrs.path && c.path === '/');
+  ok('...by emptying it and expiring it now (Max-Age=0)', c[loginName.toLowerCase()] === '' && c['max-age'] === '0');
+  ok('...with the same protections (HttpOnly, Secure, SameSite=Strict)', c.httponly === true && c.secure === true && /^strict$/i.test(c.samesite));
+  ok('the browser is then signed out: no cookie, or the emptied one, gets no session',
+     !(await asked(null)) && !(await asked(cleared.split(';')[0])));
+  const noSession = await logout({ request: new Request('https://example.test/api/logout', { method: 'POST' }) });
+  ok('log out works even when the session has already expired', noSession.status === 200 && !!noSession.headers.get('Set-Cookie'));
+  const viaGet = await logout({ request: new Request('https://example.test/api/logout') });
+  ok('log out is POST-only (a link or an image can’t trigger it)', viaGet.status === 405 && !viaGet.headers.get('Set-Cookie'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -15,6 +15,7 @@
     <img class="signin-logo" src="../assets/wcaa-logo.png" alt="WCAA" width="60" height="60">
     <h1>Website editor</h1>
     <p class="hint">Sign in to change the chapter website.</p>
+    <p class="status status--good" id="signin-note" role="status" hidden>You’re logged out. It’s safe to leave this computer.</p>
     <label class="field">
       <span class="field-label">Username</span>
       <input class="input" id="username" name="username" type="text" autocomplete="username" autocapitalize="none" required>
@@ -36,6 +37,8 @@
       <button class="mode is-on" id="mode-content" type="button" aria-pressed="true">Change the website</button>
       <button class="mode" id="mode-events" type="button" aria-pressed="false">Event sign-ups</button>
     </nav>
+    <button class="bar-save" id="save-top" type="button" disabled>Save changes</button>
+    <button class="logout" id="logout" type="button">Log out</button>
   </header>
 
   <main id="content-view">

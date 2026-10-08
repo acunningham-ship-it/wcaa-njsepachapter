@@ -87,6 +87,20 @@ textarea.input { resize: vertical; }
   color: #fff; background: transparent; border: 2px solid rgba(255,255,255,.55); border-radius: 8px;
 }
 .mode.is-on { background: #fff; color: var(--blue-950); border-color: #fff; }
+/* Log out: same size as the mode buttons, set apart as the way out (officers share one login). */
+.logout {
+  min-height: 48px; padding: 0 18px; font: 600 18px/1 var(--font-body); cursor: pointer;
+  color: #fff; background: transparent; border: 2px solid rgba(255,255,255,.55); border-radius: 8px;
+}
+.logout:hover { background: rgba(255,255,255,.12); }
+/* Save, up top beside Log out so it's as easy to find (officer feedback 2026-10-07). Mirrors the
+   bottom Save: lit gold when there's something to save, dimmed when there isn't. */
+.bar-save {
+  min-height: 48px; padding: 0 18px; font: 600 18px/1 var(--font-body); cursor: pointer;
+  color: var(--blue-950); background: var(--gold-500); border: 2px solid var(--gold-500); border-radius: 8px;
+}
+.bar-save:hover:not(:disabled) { background: var(--gold-400); border-color: var(--gold-400); }
+.bar-save:disabled { cursor: default; color: rgba(255,255,255,.6); background: transparent; border-color: rgba(255,255,255,.3); }
 
 /* ---------- changing the website ---------- */
 #content-view { display: flex; flex-direction: column; min-height: calc(100vh - 68px); }
@@ -180,6 +194,10 @@ textarea.input { resize: vertical; }
   .bar { padding: 10px 14px; }
   .modes { margin-left: 0; width: 100%; }
   .mode { flex: 1; padding: 0 10px; font-size: 17px; }
+  .bar-save { order: 2; margin-left: auto; }   /* Save + Log out beside the title, above the mode buttons */
+  .logout { order: 2; }
+  .bar-save, .logout { padding: 0 14px; }
+  .modes { order: 3; }
   .toolbar, .hint-strip { margin-left: 14px; margin-right: 14px; padding-left: 0; padding-right: 0; }
   .hint-strip { padding: 10px 12px; }
   .page-pick, .page-pick .input { width: 100%; min-width: 0; }
@@ -195,4 +213,10 @@ textarea.input { resize: vertical; }
   .ev-table thead { display: none; }
   .ev-table tr { display: block; border-bottom: 1px solid var(--neutral-300); padding: 8px 0; }
   .ev-table td { display: block; border: 0; padding: 4px 0; }
+}
+
+/* Narrow phones: the bar's name gives way so Save and Log out share the first row with the logo
+   (the sign-in screen already said "Website editor"). Checked at 360 and 390. */
+@media (max-width: 520px) {
+  .bar-title { display: none; }
 }

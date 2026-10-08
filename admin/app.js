@@ -141,6 +141,7 @@ function updateStatus() {
     status.textContent = state.dirty ? 'You have changes that aren’t saved yet.' : state.note || 'Everything is saved.';
   }
   $('#save').disabled = !check.ok || !state.dirty || state.saving;
+  $('#save-top').disabled = $('#save').disabled;   // the same button, also at the top where officers look
   $('#discard').disabled = !state.dirty || state.saving;
 }
 
@@ -773,7 +774,33 @@ function discard() {
 
 /* ---------- sign in ---------- */
 
-function showSignIn() { $('#signin').hidden = false; $('#app').hidden = true; }
+function showSignIn() {
+  $('#signin').hidden = false; $('#app').hidden = true;
+  const note = $('#signin-note');
+  if (state.dirty) {
+    // The 12-hour session ran out mid-edit. Say so, and (signIn below) keep their changes.
+    note.className = 'status status--dirty';   // same amber as “changes that aren’t saved yet” below
+    note.textContent = 'You were signed out, so your changes aren’t saved yet. Sign in again and they’ll still be here.';
+    note.hidden = false;
+  } else {
+    note.className = 'status status--good';
+    note.textContent = 'You’re logged out. It’s safe to leave this computer.';
+    note.hidden = !/[?&]logged-out(&|$)/.test(location.search);
+  }
+}
+
+/* ---------- logging out ----------
+   Clears the session cookie (functions/api/logout.js), then RELOADS the page instead of just
+   hiding the editor: the sign-ups screen holds people's emails and phone numbers, and on a
+   shared computer none of that should stay in the page. replace() also takes this page out of
+   the Back button, so nobody can step back into it. */
+async function logOut() {
+  if (state.dirty && !confirm('You have changes that aren’t saved yet. Log out anyway and lose them?')) return;
+  const res = await fetch('../api/logout', { method: 'POST' }).catch(() => null);
+  if (!res || !res.ok) { alert('Logging out didn’t work. Please try again, or close this browser window.'); return; }
+  state.dirty = false;   // the unsaved-changes question has just been answered
+  location.replace(location.pathname + '?logged-out');
+}
 function showApp() { $('#signin').hidden = true; $('#app').hidden = false; }
 
 async function signIn(event) {
@@ -787,6 +814,10 @@ async function signIn(event) {
   }).catch(() => null);
   const body = res ? await res.json().catch(() => ({})) : {};
   if (!res || !res.ok || !body.ok) { error.textContent = body.error || 'That didn’t work. Please try again.'; return; }
+  if (location.search) history.replaceState(null, '', location.pathname);   // drop "?logged-out"
+  /* Signed back in after the session ran out mid-edit: go back to their unsaved changes. start()
+     would reload the site's content over them, silently losing the work. */
+  if (state.dirty) { showApp(); updateStatus(); return; }
   await start();
 }
 
@@ -940,7 +971,9 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 $('#signin-form').addEventListener('submit', signIn);
+$('#logout').addEventListener('click', logOut);
 $('#save').addEventListener('click', saveSite);
+$('#save-top').addEventListener('click', saveSite);
 $('#discard').addEventListener('click', discard);
 $('#drawer-close').addEventListener('click', closeDrawer);
 $('#open-layout').addEventListener('click', () => openDrawer({ kind: 'layout' }));

@@ -93,6 +93,10 @@
 .wcaa-ev__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
 .wcaa-ev__actions .wcaa-btn,
 .wcaa-reg .wcaa-btn { min-height: 52px; font-size: 18px; text-transform: none; letter-spacing: normal; }
+/* On a phone the card's text column is narrower than "Register for this event" on one line, and
+   the card hides overflow, so the button was cut off ("Register for this even", 42px at 390px).
+   Let it wrap inside its column instead. */
+.wcaa-ev__actions .wcaa-btn { max-width: 100%; white-space: normal; text-align: center; }
 
 /* The field bots fill and people never see (functions/api/_guard.js). Off-screen, not
    display:none, because some bots skip inputs that aren't rendered. */

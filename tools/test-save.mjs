@@ -152,10 +152,38 @@ globalThis.fetch = async (url, init = {}) => {
 };
 
 const SECRET = 'test-session-secret';
+/* A D1 stand-in: real SQLite with the real migrations. Production always has one, and a save
+   of content with an event that takes registrations syncs it (and refuses to commit without it). */
+class Stmt {
+  constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
+  bind(...a) { this.args = a; return this; }
+  async run() { const r = this.db.prepare(this.sql).run(...this.args); return { meta: { changes: r.changes } }; }
+  async all() { return { results: this.db.prepare(this.sql).all(...this.args) }; }
+  async first() { const r = this.db.prepare(this.sql).get(...this.args); return r === undefined ? null : r; }
+}
+const makeDB = ({ failBatch = false, only0001 = false } = {}) => {
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec(read('migrations/0001_rsvps.sql'));
+  if (!only0001) db.exec(read('migrations/0002_links_and_limits.sql'));
+  return {
+    raw: db,
+    prepare: (sql) => new Stmt(db, sql),
+    // D1's batch is one transaction: all or nothing.
+    batch: async (stmts) => {
+      if (failBatch) throw new Error('D1 unavailable');
+      db.exec('BEGIN');
+      try { for (const st of stmts) db.prepare(st.sql).run(...st.args); db.exec('COMMIT'); }
+      catch (e) { db.exec('ROLLBACK'); throw e; }
+      return stmts.map(() => ({ success: true }));
+    },
+  };
+};
+
 const ENV = { SESSION_SECRET: SECRET, GITHUB_TOKEN: 'ghp_test' };
 const COOKIE = makeSessionCookie(await signToken({ exp: Date.now() + 3600e3, sub: 'Denise' }, SECRET), 3600);
 
-const callSave = async (payload, { cookie = COOKIE, env = ENV } = {}) => {
+const callSave = async (payload, { cookie = COOKIE, env = { ...ENV, DB: makeDB() } } = {}) => {
   const headers = { 'content-type': 'application/json' };
   if (cookie) headers.cookie = cookie;
   const request = new Request('https://wcaa.test/api/save', { method: 'POST', headers, body: JSON.stringify(payload) });
@@ -310,31 +338,6 @@ const callSave = async (payload, { cookie = COOKIE, env = ENV } = {}) => {
    ⛔ The repo is PUBLIC. A meeting link meant only for registrants must never be committed —
    not in pages.json, not in any generated page — and the D1 rows must follow the content. */
 {
-  class Stmt {
-    constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
-    bind(...a) { this.args = a; return this; }
-    async run() { const r = this.db.prepare(this.sql).run(...this.args); return { meta: { changes: r.changes } }; }
-    async all() { return { results: this.db.prepare(this.sql).all(...this.args) }; }
-    async first() { const r = this.db.prepare(this.sql).get(...this.args); return r === undefined ? null : r; }
-  }
-  const makeDB = ({ failBatch = false, only0001 = false } = {}) => {
-    const db = new DatabaseSync(':memory:');
-    db.exec('PRAGMA foreign_keys = ON');
-    db.exec(read('migrations/0001_rsvps.sql'));
-    if (!only0001) db.exec(read('migrations/0002_links_and_limits.sql'));
-    return {
-      raw: db,
-      prepare: (sql) => new Stmt(db, sql),
-      // D1's batch is one transaction: all or nothing.
-      batch: async (stmts) => {
-        if (failBatch) throw new Error('D1 unavailable');
-        db.exec('BEGIN');
-        try { for (const st of stmts) db.prepare(st.sql).run(...st.args); db.exec('COMMIT'); }
-        catch (e) { db.exec('ROLLBACK'); throw e; }
-        return stmts.map(() => ({ success: true }));
-      },
-    };
-  };
   const evPage = (doc) => doc.pages.find((pg) => pg.slug === 'events');
   const evItems = (doc) => evPage(doc).sections[0].blocks.find((b) => b.type === 'events').items;
   const committedFiles = () => gh.blobContent;

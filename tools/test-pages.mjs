@@ -282,8 +282,13 @@ const content = JSON.parse(read('content/pages.json'));
   }
   ok('every gallery image has an alt attribute',
      (p['gallery.html'].match(/<img /g) || []).length === (p['gallery.html'].match(/<img [^>]*alt="/g) || []).length);
-  ok('gallery renders all nine photos', (p['gallery.html'].match(/<figure /g) || []).length === 9);
-  ok('events page renders all five events', (p['events.html'].match(/<article /g) || []).length === 5);
+  // Counts come from the content: the officer adds events and photos, so a hardcoded number goes stale.
+  const itemsOf = (slug, type) => { let n = 0; (function walk(bs) { for (const b of bs || []) {
+    if (b && b.type === type) n += (b.items || []).length; walk(b && b.blocks); walk(b && b.left); walk(b && b.right); } })(
+    content.pages.find((pg) => pg.slug === slug).sections.flatMap((sec) => sec.blocks || [])); return n; };
+  const photos = itemsOf('gallery', 'gallery'), events = itemsOf('events', 'events');
+  ok(`gallery renders all ${photos} photos`, photos > 0 && (p['gallery.html'].match(/<figure /g) || []).length === photos);
+  ok(`events page renders all ${events} events`, events > 0 && (p['events.html'].match(/<article /g) || []).length === events);
 }
 
 /* ---------- 5. the Turnstile widget is gated on a configured site key ---------- */

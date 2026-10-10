@@ -71,7 +71,7 @@ export const FIELDS = {
       { key: 'register', kind: 'check', label: 'Let people register on the website',
         hint: 'Adds a “Register for this event” button. You’ll see who registered under Event sign-ups.' },
       { key: 'meetingLink', kind: 'text', label: 'Meeting link (Zoom, Google Meet or Teams)',
-        hint: 'Paste the whole link. People who register get a “Join the meeting” button.' },
+        hint: 'Paste the whole link. People who register get it on their confirmation and under the event’s “List of registrants” button.' },
       { key: 'meetingPublic', kind: 'check', label: 'Show the meeting link to everyone',
         hint: 'Puts a “Join the meeting” button on the event itself, for anyone visiting the site.' },
     ] },

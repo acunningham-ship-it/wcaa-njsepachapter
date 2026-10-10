@@ -296,6 +296,15 @@ const BLOCKS = {
         const reg = e.register && typeof e.id === 'string' && EVENT_ID.test(e.id)
           ? '<a class="wcaa-btn wcaa-btn--primary wcaa-btn--lg wcaa-ev__reg" href="register.html?event=' + attr(e.id) + '">Register for this event</a>'
           : '';
+        /* "List of registrants": a sibling of Register, on exactly the events that take
+           registration (so e.id is a valid EVENT_ID here). It opens the dialog js/registrants.js
+           builds — who is registered, plus the meeting link — behind the visibility gate the
+           server enforces (functions/api/registrants.js). It carries ONLY the event id and title:
+           no names and no link ever enter this markup, which is committed to a public repo. */
+        const registrants = reg
+          ? '<button type="button" class="wcaa-btn wcaa-btn--outline wcaa-btn--lg wcaa-ev__registrants"' +
+            ' data-registrants="' + attr(e.id) + '" data-event-title="' + attr(e.title) + '">List of registrants</button>'
+          : '';
         const meeting = e.meetingPublic ? safeMeetingUrl(e.meetingLink) : '';
         const join = meeting
           ? '<a class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" href="' + attr(meeting) + '" target="_blank" rel="noreferrer">Join the meeting</a>'
@@ -310,7 +319,7 @@ const BLOCKS = {
           (meta ? '<div class="wcaa-ev__meta">' + meta + '</div>' : '') +
           (e.description ? '<p class="wcaa-ev__desc"' + F(ie, 'description') + '>' + esc(e.description) + '</p>' : '') +
           (href ? '<a class="wcaa-ev__link" href="' + attr(href) + '">' + esc(e.linkLabel || 'Event Details') + ' →</a>' : '') +
-          (reg || join ? '<div class="wcaa-ev__actions">' + reg + join + '</div>' : '') +
+          (reg || join ? '<div class="wcaa-ev__actions">' + reg + registrants + join + '</div>' : '') +
           /* Who's going: an EMPTY slot that js/going.js fills from /api/attendees when the page
              is viewed. Names never enter this markup: it is committed to a public repo. */
           (reg ? '<p class="wcaa-ev__going" data-going="' + attr(e.id) + '" hidden></p>' : '') +
@@ -733,7 +742,7 @@ export const CANONICAL_REDIRECT = [
 ].join('\n') + '\n';
 
 /* The document shell every generated page shares. */
-function documentFor(site, { title, navHref, hasForm, hasGoing, hero, body }) {
+function documentFor(site, { title, navHref, hasForm, hasGoing, hasRegistrants, hero, body }) {
   return (
     '<!DOCTYPE html>\n' +
     '<html lang="en">\n<head>\n' +
@@ -754,6 +763,10 @@ function documentFor(site, { title, navHref, hasForm, hasGoing, hero, body }) {
     /* ...and the who's-going script ONLY on a page with an event people can register for.
        Without it nothing is shown, which is the safe way to fail. */
     (hasGoing ? '<script src="js/going.js" defer></script>\n' : '') +
+    /* ...and the registrant-list script ONLY on a page that has a "List of registrants" button
+       (an event taking registration). Same justification as the who's-going script: without it
+       the button does nothing, which is the safe way to fail. */
+    (hasRegistrants ? '<script src="js/registrants.js" defer></script>\n' : '') +
     CANONICAL_REDIRECT +
     '</head>\n<body>\n' +
     renderNav(site, navHref) +
@@ -775,6 +788,7 @@ export function renderPage(page, site, opts) {
     navHref: page.navHref,
     hasForm: pageHasForm(page),
     hasGoing: !edit && body.includes(' data-going="'),
+    hasRegistrants: !edit && body.includes(' data-registrants="'),
     hero: renderHero(page.hero, edit ? { base: 'hero' } : null),
     body,
   });

@@ -125,3 +125,44 @@
 .wcaa-reg__url { word-break: break-all; font-weight: 600; color: var(--text-heading); }
 .wcaa-reg .wcaa-form__msg { font-size: 18px; }
 @media (max-width: 600px) { .wcaa-reg__panel { padding: var(--space-6) var(--space-5); } }
+
+/* ---------- "List of registrants" dialog (js/registrants.js) ----------
+   A small dialog opened by the "List of registrants" button next to Register. Built entirely by
+   the script at view time — none of this markup is in the committed page — so these rules only
+   style what the script creates. Same member-first sizing as the registration screens: 18px text,
+   52px-tall buttons, plain words. */
+.wcaa-rl {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4); background: rgba(10, 23, 41, 0.55);
+}
+.wcaa-rl[hidden] { display: none; }
+.wcaa-rl__box {
+  position: relative; background: var(--surface-card); border-radius: var(--radius-md); box-shadow: var(--shadow-card);
+  padding: var(--space-8); width: 100%; max-width: 440px; max-height: calc(100vh - var(--space-8));
+  overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4); font-size: 18px;
+}
+.wcaa-rl__box:focus { outline: none; }
+.wcaa-rl__close {
+  position: absolute; top: 10px; right: 12px; width: 40px; height: 40px; border: none; background: transparent;
+  font-size: 28px; line-height: 1; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-xs);
+}
+.wcaa-rl__close:hover { color: var(--text-heading); background: var(--blue-50); }
+.wcaa-rl__title {
+  margin: 0 36px 0 0; font-family: var(--font-display); font-weight: 400; font-size: var(--text-2xl);
+  line-height: 1.2; color: var(--text-heading);
+}
+.wcaa-rl__body { display: flex; flex-direction: column; gap: var(--space-3); }
+.wcaa-rl .wcaa-btn { min-height: 52px; font-size: 18px; text-transform: none; letter-spacing: normal; }
+.wcaa-rl .wcaa-field__label, .wcaa-rl .wcaa-field__input { font-size: 18px; }
+.wcaa-rl .wcaa-field__input { min-height: 52px; padding: 12px 14px; box-sizing: border-box; }
+.wcaa-rl__msg { margin: 0; font-size: 18px; line-height: 1.5; color: var(--text-body); }
+.wcaa-rl__msg--bad { color: var(--color-error); }
+.wcaa-rl__count { margin: 0; font-weight: 600; color: var(--text-heading); }
+.wcaa-rl__url { margin: 0; word-break: break-all; font-size: 15px; color: var(--text-muted); }
+.wcaa-rl__link { margin: 0; }
+.wcaa-rl__names { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.wcaa-rl__names li {
+  font-size: 18px; line-height: 1.4; color: var(--text-body);
+  padding: 8px 12px; background: var(--blue-50); border-radius: var(--radius-xs);
+}
+@media (max-width: 600px) { .wcaa-rl__box { padding: var(--space-6) var(--space-5); } }

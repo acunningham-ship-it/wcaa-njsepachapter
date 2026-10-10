@@ -161,7 +161,7 @@ const content = JSON.parse(read('content/pages.json'));
     const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
     ok('the payload introduced no script',
        scripts.every((m) => m[2].trim() === '') &&
-       srcs.every((u) => u === 'js/forms.js' || u === 'js/going.js' || u === 'https://challenges.cloudflare.com/turnstile/v0/api.js'),
+       srcs.every((u) => u === 'js/forms.js' || u === 'js/going.js' || u === 'js/registrants.js' || u === 'https://challenges.cloudflare.com/turnstile/v0/api.js'),
        { srcs, inline: scripts.map((m) => m[2].slice(0, 30)) });
   }
   ok('the payload never becomes real markup', html.indexOf('<img src=x') === -1);
@@ -262,6 +262,9 @@ const content = JSON.parse(read('content/pages.json'));
   /* ...plus js/going.js, and ONLY on a page with an event people can register for (it fills
      that card's "who's going" slot from /api/attendees). */
   const GOING_SRC = 'js/going.js';
+  /* ...and js/registrants.js, ONLY on a page with a "List of registrants" button (the same
+     register-taking events). It powers that button's dialog, from /api/registrants. */
+  const REGISTRANTS_SRC = 'js/registrants.js';
   for (const [name, full] of Object.entries(p)) {
     const head = full.slice(0, full.indexOf('</head>'));
     ok(`${name} carries the canonical redirect exactly once, in <head>`,
@@ -280,15 +283,19 @@ const content = JSON.parse(read('content/pages.json'));
        data.length === (name === 'register.html' ? 1 : 0), data.length);
     const srcs = scripts.map((m) => (m[1].match(/src="([^"]+)"/) || [])[1]).filter(Boolean);
     const hasGoing = html.includes(' data-going="');
-    ok(`${name} loads only permitted scripts`, srcs.every((u) => ALLOWED_SRC.includes(u) || (hasGoing && u === GOING_SRC)), srcs);
+    const hasRegistrants = html.includes(' data-registrants="');
+    ok(`${name} loads only permitted scripts`,
+       srcs.every((u) => ALLOWED_SRC.includes(u) || (hasGoing && u === GOING_SRC) || (hasRegistrants && u === REGISTRANTS_SRC)), srcs);
     ok(`${name} loads the who's-going script exactly when it has a who's-going slot`,
        srcs.includes(GOING_SRC) === hasGoing && srcs.filter((u) => u === GOING_SRC).length <= 1, { hasGoing, srcs });
+    ok(`${name} loads the registrant-list script exactly when it has a registrant-list button`,
+       srcs.includes(REGISTRANTS_SRC) === hasRegistrants && srcs.filter((u) => u === REGISTRANTS_SRC).length <= 1, { hasRegistrants, srcs });
     if (hasForm) {
       ok(`${name} has a form, so it loads both form scripts`,
          ALLOWED_SRC.every((u) => srcs.includes(u)), srcs);
     } else {
       ok(`${name} has no form, so it ships no FORM script`, !srcs.some((u) => ALLOWED_SRC.includes(u)), srcs);
-      if (!hasGoing) ok(`${name} has no form and no event to register for, so it ships NO script at all`, scripts.length === 0, srcs);
+      if (!hasGoing && !hasRegistrants) ok(`${name} has no form and no event to register for, so it ships NO script at all`, scripts.length === 0, srcs);
     }
     /* A page highlights its own nav link, and only pages that ARE in the nav can.
        join.html and 404.html are reachable but not nav entries, so zero is right
@@ -359,6 +366,18 @@ const content = JSON.parse(read('content/pages.json'));
      card({ register: true, id: 'oct-14-fall-tour' }).includes('href="register.html?event=oct-14-fall-tour">Register for this event</a>'));
   ok('...but not with registration off', !card({ register: false, id: 'oct-14-fall-tour' }).includes('register.html'));
   ok('...and not with an id that isn’t a valid registration id', !card({ register: true, id: 'Bad Id' }).includes('register.html'));
+  /* "List of registrants": a sibling button on exactly the events that take registration. It
+     carries only the event id + title — never the meeting link, public or private (that is read
+     from D1 at view time by /api/registrants, behind the gate). */
+  ok('an event taking registration also gets a "List of registrants" button carrying its id',
+     card({ register: true, id: 'oct-14-fall-tour' }).includes('data-registrants="oct-14-fall-tour"') &&
+     card({ register: true, id: 'oct-14-fall-tour' }).includes('>List of registrants</button>'));
+  ok('...it is NOT present when registration is off', !card({ register: false, id: 'oct-14-fall-tour' }).includes('data-registrants='));
+  ok('...nor with an id that isn’t a valid registration id', !card({ register: true, id: 'Bad Id' }).includes('data-registrants='));
+  const registrantsBtn = (e) => (card(e).match(/<button[^>]*data-registrants[\s\S]*?<\/button>/) || [''])[0];
+  ok('the registrants button element carries only the id + title, never the meeting link',
+     !/https:|zoom|REGSECRET/i.test(registrantsBtn({ register: true, id: 'x-2', meetingPublic: false, meetingLink: 'https://zoom.us/j/REGSECRET' })) &&
+     !/https:|zoom|PUBSECRET/i.test(registrantsBtn({ register: true, id: 'x-3', meetingPublic: true, meetingLink: 'https://zoom.us/j/PUBSECRET' })));
   ok('...and not with no id at all', !card({ register: true }).includes('register.html'));
   ok('a meeting link shown to everyone renders “Join the meeting” on the card',
      card({ meetingPublic: true, meetingLink: 'https://us02web.zoom.us/j/123' }).includes('href="https://us02web.zoom.us/j/123" target="_blank" rel="noreferrer">Join the meeting</a>'));
@@ -434,9 +453,16 @@ const content = JSON.parse(read('content/pages.json'));
     /* A button is live only if it submits a form the site can actually send.
        forms.js handles form[data-endpoint]; anything else is decoration. */
     const wired = html.includes('data-endpoint=') && html.includes('js/forms.js');
+    /* The "List of registrants" button is wired by js/registrants.js the same way a submit is
+       wired by js/forms.js: its data-registrants attribute + the script actually loaded = live.
+       A data-registrants button on a page that did NOT load the script is still dead. */
+    const registrantsWired = html.includes(' data-registrants="') && html.includes('js/registrants.js');
     for (const m of html.matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)) {
-      const type = attrOf('<button' + m[1] + '>', 'type') || 'submit';
-      if (!(type === 'submit' && wired)) dead.push(strip(m[2]));
+      const openTag = '<button' + m[1] + '>';
+      const type = attrOf(openTag, 'type') || 'submit';
+      const live = (type === 'submit' && wired) ||
+                   (attrOf(openTag, 'data-registrants') !== null && registrantsWired);
+      if (!live) dead.push(strip(m[2]));
     }
     for (const m of html.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)) {
       /* A link rendered `hidden` can't be seen or clicked. register.html's "Join the meeting"
@@ -473,6 +499,12 @@ const content = JSON.parse(read('content/pages.json'));
   /* ...and the same submit is flagged when nothing can send it. */
   ok('control: a submit with no endpoint IS flagged',
      inertIn('<form><button type="submit">Send</button></form>').length === 1);
+  /* ...and the registrant-list button: live only when its script is actually loaded. */
+  ok('control: a registrant-list button IS live when js/registrants.js is loaded',
+     inertIn('<script src="js/registrants.js"></script>' +
+             '<button type="button" data-registrants="x">List of registrants</button>').length === 0);
+  ok('control: the same button with NO script IS flagged as inert',
+     inertIn('<button type="button" data-registrants="x">List of registrants</button>').length === 1);
 
   /* The dues controls must still be REACHABLE, not merely non-inert -- deleting
      them would also satisfy the assertion above. */

@@ -299,11 +299,18 @@ const BLOCKS = {
         /* "List of registrants": a sibling of Register, on exactly the events that take
            registration (so e.id is a valid EVENT_ID here). It opens the dialog js/registrants.js
            builds — who is registered, plus the meeting link — behind the visibility gate the
-           server enforces (functions/api/registrants.js). It carries ONLY the event id and title:
-           no names and no link ever enter this markup, which is committed to a public repo. */
+           server enforces (functions/api/registrants.js). It carries ONLY the event id, the title,
+           and the PUBLIC Turnstile site key: no names and no meeting link ever enter this markup,
+           which is committed to a public repo. The site key is a public client identifier (it is
+           already in the page HTML on every form), and the gated email check needs it to run the
+           same bot challenge the sign-up form does; js/registrants.js renders the widget in the
+           dialog and loads the Turnstile script on demand. */
+        const tkey = site && typeof site.turnstileSiteKey === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(site.turnstileSiteKey.trim())
+          ? site.turnstileSiteKey.trim() : '';
         const registrants = reg
           ? '<button type="button" class="wcaa-btn wcaa-btn--outline wcaa-btn--lg wcaa-ev__registrants"' +
-            ' data-registrants="' + attr(e.id) + '" data-event-title="' + attr(e.title) + '">List of registrants</button>'
+            ' data-registrants="' + attr(e.id) + '" data-event-title="' + attr(e.title) + '"' +
+            (tkey ? ' data-turnstile-key="' + attr(tkey) + '"' : '') + '>List of registrants</button>'
           : '';
         const meeting = e.meetingPublic ? safeMeetingUrl(e.meetingLink) : '';
         const join = meeting

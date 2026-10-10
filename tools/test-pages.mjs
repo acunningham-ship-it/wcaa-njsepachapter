@@ -375,7 +375,7 @@ const content = JSON.parse(read('content/pages.json'));
   ok('...it is NOT present when registration is off', !card({ register: false, id: 'oct-14-fall-tour' }).includes('data-registrants='));
   ok('...nor with an id that isn’t a valid registration id', !card({ register: true, id: 'Bad Id' }).includes('data-registrants='));
   const registrantsBtn = (e) => (card(e).match(/<button[^>]*data-registrants[\s\S]*?<\/button>/) || [''])[0];
-  ok('the registrants button element carries only the id + title, never the meeting link',
+  ok('the registrants button carries no meeting link, public or private (id/title/public turnstile key only)',
      !/https:|zoom|REGSECRET/i.test(registrantsBtn({ register: true, id: 'x-2', meetingPublic: false, meetingLink: 'https://zoom.us/j/REGSECRET' })) &&
      !/https:|zoom|PUBSECRET/i.test(registrantsBtn({ register: true, id: 'x-3', meetingPublic: true, meetingLink: 'https://zoom.us/j/PUBSECRET' })));
   ok('...and not with no id at all', !card({ register: true }).includes('register.html'));

@@ -47,6 +47,7 @@ import { safeMeetingUrl } from '../../js/render.js';
 import { displayName } from './attendees.js';
 import { readBody, validate, text, email as emailField } from './_input.js';
 import { rateLimited, RATE_LIMIT_MESSAGE } from './_guard.js';
+import { verifyTurnstile } from './_turnstile.js';
 
 const GENERIC = 'The registrant list isn’t available right now. Please try again in a moment.';
 const NOT_REGISTERED =
@@ -59,19 +60,33 @@ function viewMode(env) {
   return env && env.REGISTRANT_VIEW === 'public' ? 'public' : 'gated';
 }
 
-/* The roster + link for one event. Selects `name` ONLY from rsvps — never email,
-   phone, business or notes — and runs each through displayName (first name + last
-   initial, or dropped). The link is validated by safeMeetingUrl, same as rsvp.js;
-   a missing event_links table (migration 0002 not applied) just means no link. */
+/* The roster + link for one event.
+
+   ⛔ OPT-IN ONLY. register.html promises each person, in writing, "Your name appears on the events
+   page only if you tick the box above," and this list IS on the events page (it is what the button
+   opens). So the roster shows ONLY the people who ticked that box — the SAME rsvp_listed JOIN the
+   public who's-going list uses (attendees.js), so the two cannot disagree about who consented.
+   Everyone registered is still visible to the OFFICER through the authenticated admin
+   (functions/api/rsvps.js), which is unchanged; this public/registrant-facing list is the narrower
+   one. A missing rsvp_listed table (migration 0003 not applied) means nobody has opted in yet — an
+   empty list, never an error, same as attendees.js.
+
+   Selects `name` ONLY — never email, phone, business or notes — and runs each through displayName
+   (first name + last initial, or dropped). The link is validated by safeMeetingUrl, same as
+   rsvp.js; a missing event_links table (migration 0002) just means no link. */
 async function rosterFor(env, eventId) {
   const names = [];
-  const r = await env.DB.prepare(
-    'SELECT name FROM rsvps WHERE event_id = ? ORDER BY created_at ASC, id ASC LIMIT 2000'
-  ).bind(eventId).all();
-  for (const row of r.results || []) {
-    const n = displayName(row.name);
-    if (n) names.push(n);
-  }
+  try {
+    const r = await env.DB.prepare(
+      `SELECT r.name FROM rsvps r
+         JOIN rsvp_listed l ON l.event_id = r.event_id AND l.email_key = r.email_key
+        WHERE r.event_id = ? ORDER BY r.created_at ASC, r.id ASC LIMIT 2000`
+    ).bind(eventId).all();
+    for (const row of r.results || []) {
+      const n = displayName(row.name);
+      if (n) names.push(n);
+    }
+  } catch { /* migration 0003 not applied yet: nobody is listed */ }
   let meeting = null;
   try {
     const link = await env.DB.prepare('SELECT url FROM event_links WHERE event_id = ?').bind(eventId).first();
@@ -105,7 +120,7 @@ export async function onRequest(context) {
 
   /* Resolve the event id and (for POST) the email. GET reads the query string;
      POST reads + validates a JSON or form body the same way /api/rsvp does. */
-  let eventId, emailKey = null;
+  let eventId, emailKey = null, turnstileToken = null;
   if (isGet) {
     eventId = (new URL(request.url).searchParams.get('event_id') || '').trim();
     if (!eventId) return json({ ok: false, error: 'Which event?' }, 400);
@@ -121,6 +136,7 @@ export async function onRequest(context) {
     if (!v.ok) return json({ ok: false, error: v.error }, 400);
     eventId = v.values.event_id;
     emailKey = v.values.email_key || '';   // lowercased, trimmed — or '' when not supplied in public mode
+    turnstileToken = body['cf-turnstile-response'];
   }
 
   let exists;
@@ -137,10 +153,15 @@ export async function onRequest(context) {
      and no link, so the button knows to ask for the email before anything is shown. */
   if (isGet) return json({ ok: true, mode: 'gated' }, 200, { 'Cache-Control': 'no-store' });
 
-  /* A gated POST is the email check. Rate-limit it first so the endpoint can't be
-     turned into an "is this address registered?" oracle by brute force (same cheap
-     per-IP limiter the public forms use; its own bucket, and it fails open if the
-     table isn't there yet). */
+  /* A gated POST is the email check, and the one place this endpoint could be turned into an
+     "is email X registered for event Y?" oracle. The per-IP rate limit alone is defeated by IP
+     rotation, so the real gate is a Turnstile challenge — BEFORE the database is touched, exactly
+     as /api/rsvp does, so an unverified (scripted) request never reaches the gate query however
+     many addresses it rotates through. Fails CLOSED when TURNSTILE_SECRET is unset (_turnstile.js):
+     a misconfigured key refuses the check rather than silently opening the oracle. The rate limit
+     stays as a second, cheaper layer. */
+  const gate = await verifyTurnstile(env, turnstileToken, request);
+  if (!gate.ok) return json({ ok: false, error: gate.error }, gate.status);
   if (await rateLimited(env, request, 'registrants')) return json({ ok: false, error: RATE_LIMIT_MESSAGE }, 429);
 
   let registered;

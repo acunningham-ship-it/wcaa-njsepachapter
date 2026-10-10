@@ -24,7 +24,31 @@
   if (!buttons.length || !window.fetch) return;
 
   var ENDPOINT = '/api/registrants';
-  var lastFocus = null;   // the button that opened the dialog, so focus can return to it on close
+  var TURNSTILE_API = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+  var lastFocus = null;    // the button that opened the dialog, so focus can return to it on close
+  var tsWidgetId = null;   // the Turnstile widget currently rendered in the gated form, if any
+
+  /* Load the Turnstile script on demand — only when a gated view actually needs the challenge, so
+     the events page ships none of it until the button is used. Resolves with window.turnstile. */
+  var tsLoading = null;
+  function loadTurnstile() {
+    if (window.turnstile && typeof window.turnstile.render === 'function') return Promise.resolve(window.turnstile);
+    if (tsLoading) return tsLoading;
+    tsLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = TURNSTILE_API; s.async = true; s.defer = true;
+      s.onload = function () { window.turnstile ? resolve(window.turnstile) : reject(new Error('turnstile unavailable')); };
+      s.onerror = function () { reject(new Error('turnstile failed to load')); };
+      document.head.appendChild(s);
+    });
+    return tsLoading;
+  }
+  function removeWidget() {
+    if (tsWidgetId !== null && window.turnstile && typeof window.turnstile.remove === 'function') {
+      try { window.turnstile.remove(tsWidgetId); } catch (e) { /* already gone */ }
+    }
+    tsWidgetId = null;
+  }
 
   /* ---------- the dialog, built once and reused ---------- */
   var overlay = document.createElement('div');
@@ -80,6 +104,7 @@
   function closeDialog() {
     overlay.hidden = true;
     document.removeEventListener('keydown', onKeydown);
+    removeWidget();
     clear(bodyEl);
     if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
     lastFocus = null;
@@ -147,10 +172,14 @@
     }
   }
 
-  /* The gated-mode form: ask for the email the person registered with, POST it, render on success
-     or show the server's message on failure. No email is ever shown back; this only sends one. */
-  function renderGate(eventId) {
+  /* The gated-mode form: ask for the email the person registered with, run the same Turnstile
+     bot-check the sign-up form uses, POST both, render on success or show the server's message on
+     failure. The email is used only to send; it is never shown back, and the server returns no
+     other registrant's address. */
+  function renderGate(eventId, tkey) {
     clear(bodyEl);
+    removeWidget();
+
     var intro = document.createElement('p');
     intro.className = 'wcaa-rl__msg';
     intro.textContent = 'Enter the email you registered with to see who’s registered and the meeting link.';
@@ -173,6 +202,12 @@
     field.appendChild(input);
     bodyEl.appendChild(field);
 
+    /* The bot check renders into its own slot. Managed Turnstile mostly solves invisibly; an
+       interactive challenge appears here if Cloudflare asks for one. */
+    var tsSlot = document.createElement('div');
+    tsSlot.className = 'wcaa-rl__ts';
+    bodyEl.appendChild(tsSlot);
+
     var submit = document.createElement('button');
     submit.type = 'button';
     submit.className = 'wcaa-btn wcaa-btn--primary wcaa-btn--md wcaa-rl__submit';
@@ -184,24 +219,41 @@
     err.hidden = true;
     bodyEl.appendChild(err);
 
+    if (tkey) {
+      loadTurnstile()
+        .then(function (ts) {
+          if (!tsSlot.isConnected) return;   // the dialog was closed before the script arrived
+          tsWidgetId = ts.render(tsSlot, { sitekey: tkey });
+        })
+        .catch(function () { /* can't load: the submit still tries; the server fails closed if it truly can't verify */ });
+    }
+
+    function fail(msg) {
+      err.textContent = msg; err.hidden = false;
+      submit.disabled = false; submit.textContent = 'Show the list';
+    }
+
     function send() {
       var email = (input.value || '').trim();
-      if (!email) { err.textContent = 'Please enter your email.'; err.hidden = false; return; }
-      submit.disabled = true;
-      var original = submit.textContent;
-      submit.textContent = 'Checking…';
-      post(eventId, email)
+      if (!email) { fail('Please enter your email.'); return; }
+      var token = '';
+      if (tkey && window.turnstile && tsWidgetId !== null) {
+        try { token = window.turnstile.getResponse(tsWidgetId) || ''; } catch (e) { token = ''; }
+        if (!token) { fail('Please complete the verification just above, then try again.'); return; }
+      }
+      submit.disabled = true; submit.textContent = 'Checking…'; err.hidden = true;
+      post(eventId, email, token)
         .then(function (r) {
           if (!r.ok || !r.body || r.body.ok !== true) {
             throw new Error((r.body && r.body.error) || 'We couldn’t show the list. Please try again.');
           }
+          removeWidget();        // the widget DOM is about to be cleared with the rest of the form
           renderList(r.body);
         })
         .catch(function (e2) {
-          err.textContent = e2.message || 'We couldn’t show the list. Please try again.';
-          err.hidden = false;
-          submit.disabled = false;
-          submit.textContent = original;
+          // Turnstile tokens are single-use; get a fresh one for the next attempt.
+          if (tkey && window.turnstile && tsWidgetId !== null) { try { window.turnstile.reset(tsWidgetId); } catch (e3) {} }
+          fail(e2.message || 'We couldn’t show the list. Please try again.');
         });
     }
 
@@ -216,12 +268,12 @@
     return fetch(ENDPOINT + '?event_id=' + encodeURIComponent(eventId), { cache: 'no-store', credentials: 'omit' })
       .then(readJson);
   }
-  function post(eventId, email) {
+  function post(eventId, email, token) {
     return fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'omit',
-      body: JSON.stringify({ event_id: eventId, email: email }),
+      body: JSON.stringify({ event_id: eventId, email: email, 'cf-turnstile-response': token || '' }),
     }).then(readJson);
   }
   function readJson(res) {
@@ -233,6 +285,7 @@
   function onOpen(trigger) {
     var eventId = trigger.getAttribute('data-registrants');
     var eventTitle = trigger.getAttribute('data-event-title') || '';
+    var tkey = trigger.getAttribute('data-turnstile-key') || '';
     if (!eventId) return;
     openDialog(trigger, eventTitle);
     message('Loading…');
@@ -242,7 +295,7 @@
           throw new Error((r.body && r.body.error) || 'We couldn’t load the list. Please try again.');
         }
         if (r.body.mode === 'public') { renderList(r.body); return; }
-        renderGate(eventId);   // "gated" (the default): ask for the email first
+        renderGate(eventId, tkey);   // "gated" (the default): ask for the email + bot-check first
       })
       .catch(function (e) {
         message(e.message || 'We couldn’t load the list. Please try again.', 'bad');

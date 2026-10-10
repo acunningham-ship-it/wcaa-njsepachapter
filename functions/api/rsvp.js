@@ -67,17 +67,6 @@ export async function onRequest(context) {
   if (!event) return json({ ok: false, error: 'Registration for that event isn’t open.' }, 404);
   if (event.closed) return json({ ok: false, error: 'Registration for this event is closed.' }, 409);
 
-  /* Not ticked: take them OFF the list before anything else, so someone who signed up again to
-     un-list themselves is never left showing. If that can't be confirmed, refuse the whole thing
-     and let them retry, except when the table doesn't exist yet (then nobody is listed anyway). */
-  if (!listed) {
-    try {
-      await env.DB.prepare('DELETE FROM rsvp_listed WHERE event_id = ? AND email_key = ?').bind(f.event_id, f.email_key).run();
-    } catch (e) {
-      if (!/no such table/i.test(String(e && e.message))) return json({ ok: false, error: GENERIC }, 500);
-    }
-  }
-
   /* One statement, so the capacity check and the insert cannot be separated by
      another request. A SELECT-then-INSERT would let two people racing for the last
      seat both read "one left" and both get it. The WHERE clause re-checks open and
@@ -117,12 +106,25 @@ export async function onRequest(context) {
     }, 409);
   }
 
-  /* Ticked: list them, now that the sign-up exists (the row points at it). If this fails they
-     are registered but not listed, which is the safe way round. */
+  /* The sign-up now exists (the capacity gate above let it through), so bring the "show my name"
+     listing in step with the box — and ONLY now. Doing it here, not before the INSERT, is what
+     keeps a 409 "full" above from un-listing someone whose edit was rejected: on that path we
+     returned already and never touched rsvp_listed.
+       ticked   -> list them (the row points at the sign-up). If this fails they are registered
+                   but not listed, which is the safe way round.
+       unticked -> take them off. If that can't be confirmed, refuse so they retry and are never
+                   left showing after un-ticking — except when the table doesn't exist yet
+                   (migration 0003 not applied), where nobody is listed anyway. */
   if (listed) {
     try {
       await env.DB.prepare('INSERT OR IGNORE INTO rsvp_listed (event_id, email_key) VALUES (?, ?)').bind(f.event_id, f.email_key).run();
     } catch { /* migration 0003 not applied yet */ }
+  } else {
+    try {
+      await env.DB.prepare('DELETE FROM rsvp_listed WHERE event_id = ? AND email_key = ?').bind(f.event_id, f.email_key).run();
+    } catch (e) {
+      if (!/no such table/i.test(String(e && e.message))) return json({ ok: false, error: GENERIC }, 500);
+    }
   }
 
   /* The meeting link goes to the person who just registered, and only to them (see migration

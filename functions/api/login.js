@@ -12,8 +12,17 @@
       thing. The username was never the secret — the password hash is — so
       normalising it removes a real lockout with no loss of strength.
    2. The expected username comes from env (ADMIN_USERNAME), so adding or changing
-      a chapter officer is a config change, not a code change and redeploy. */
-import { json, sha256Hex, constantTimeEqual, signToken, makeSessionCookie, missingEnv } from './_lib.js';
+      a chapter officer is a config change, not a code change and redeploy.
+
+   SIGN-IN CODE (2FA, 2026-10-12). Once an officer has set it up (functions/api/2fa.js), a right
+   password alone answers 401 { need2fa: true } and the page asks for the 6-digit code; the browser
+   then sends username + password + code together, so there's no half-signed-in state to steal.
+   Until it's set up, the password alone signs in, exactly as before. need2fa is only ever said
+   after a RIGHT password, so it tells a guesser nothing.
+   Every attempt counts against the same per-address limit as the public forms (_guard.js). */
+import { json, sha256Hex, constantTimeEqual, passwordOk, signToken, makeSessionCookie, missingEnv } from './_lib.js';
+import { rateLimited, RATE_LIMIT_MESSAGE } from './_guard.js';
+import { checkCode } from './_totp.js';
 
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const DEFAULT_USER = 'Denise';   // first chapter officer; override with ADMIN_USERNAME
@@ -28,6 +37,8 @@ export async function onRequest(context) {
     return json({ ok: false, error: 'The sign-in isn’t set up yet. Please contact your web person.' }, 500);
   }
 
+  if (await rateLimited(env, request, 'login')) return json({ ok: false, error: RATE_LIMIT_MESSAGE }, 429);
+
   let body;
   try { body = await request.json(); } catch { body = null; }
   const username = body && typeof body.username === 'string' ? body.username : '';
@@ -35,16 +46,25 @@ export async function onRequest(context) {
 
   // Hash both sides of both comparisons so each check costs the same regardless of input.
   const requiredUser = env.ADMIN_USERNAME || DEFAULT_USER;
-  const [userHash, expectedUserHash, passHash] = await Promise.all([
+  const [userHash, expectedUserHash, passOk] = await Promise.all([
     sha256Hex(normUser(username)),
     sha256Hex(normUser(requiredUser)),
-    sha256Hex(password),
+    passwordOk(env, password),
   ]);
   const userOk = constantTimeEqual(userHash, expectedUserHash);
-  const passOk = constantTimeEqual(passHash, String(env.ADMIN_PASSWORD_HASH).toLowerCase());
 
   if (!(userOk && passOk)) {
     return json({ ok: false, error: 'That username or password didn’t match. Please try again.' }, 401);
+  }
+
+  let second;
+  try { second = await checkCode(env, body.code); }
+  catch { return json({ ok: false, error: 'The sign-in code couldn’t be checked just now. Please try again in a minute.' }, 503); }
+  if (second === 'need') {
+    return json({ ok: false, need2fa: true, error: 'Enter the 6-digit code from your authenticator app.' }, 401);
+  }
+  if (second === 'bad') {
+    return json({ ok: false, need2fa: true, error: 'That code didn’t work. The code changes every 30 seconds, so type the one showing now.' }, 401);
   }
 
   const token = await signToken({ exp: Date.now() + SESSION_TTL_SECONDS * 1000, sub: requiredUser }, env.SESSION_SECRET);

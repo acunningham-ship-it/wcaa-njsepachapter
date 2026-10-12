@@ -24,6 +24,12 @@
       <span class="field-label">Password</span>
       <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
     </label>
+    <!-- Shown once the password is right and the sign-in code (2FA) is on. -->
+    <label class="field" id="code-field" hidden>
+      <span class="field-label">Code from your authenticator app</span>
+      <input class="input input--code" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" autocapitalize="none" spellcheck="false">
+      <span class="field-hint">Phone lost? Type one of your recovery codes instead.</span>
+    </label>
     <button class="btn btn--primary" type="submit">Sign in</button>
     <p class="status status--bad" id="signin-error" role="alert"></p>
   </form>
@@ -36,6 +42,7 @@
     <nav class="modes" aria-label="What to work on">
       <button class="mode is-on" id="mode-content" type="button" aria-pressed="true">Change the website</button>
       <button class="mode" id="mode-events" type="button" aria-pressed="false">Event sign-ups</button>
+      <button class="mode" id="mode-security" type="button" aria-pressed="false">Sign-in code</button>
     </nav>
     <button class="bar-save" id="save-top" type="button" disabled>Save changes</button>
     <button class="logout" id="logout" type="button">Log out</button>
@@ -86,8 +93,12 @@
 
   <!-- Who registered for what. Lives in the database, never in the website's files. -->
   <main class="events-view" id="events-view" hidden></main>
+
+  <!-- The sign-in code (2FA): set up, add a phone, switch off. app.js loadSecurity. -->
+  <main class="events-view" id="security-view" hidden></main>
 </div>
 
+<script src="../vendor/qrcode.js"></script>   <!-- qrcode-generator 1.4.4, MIT: draws the setup QR in the browser, nothing leaves the page -->
 <script type="module" src="app.js"></script>
 </body>
 </html>

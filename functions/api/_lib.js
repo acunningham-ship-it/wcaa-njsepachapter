@@ -48,6 +48,11 @@ export async function sha256Hex(str) {
   return hex;
 }
 
+/* ---------- the editor password: SHA-256(password) against env.ADMIN_PASSWORD_HASH, constant-time ---------- */
+export async function passwordOk(env, password) {
+  return constantTimeEqual(await sha256Hex(typeof password === 'string' ? password : ''), String(env.ADMIN_PASSWORD_HASH || '').toLowerCase());
+}
+
 /* ---------- constant-time string compare (runtime independent of where they differ) ---------- */
 export function constantTimeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;

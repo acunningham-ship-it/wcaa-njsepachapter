@@ -229,3 +229,20 @@ textarea.input { resize: vertical; }
 @media (max-width: 520px) {
   .bar-title { display: none; }
 }
+
+/* ---------- sign-in code (2FA) ---------- */
+.sec-h { font-family: var(--font-display); font-weight: 400; font-size: 26px; color: var(--text-heading); margin: var(--space-8) 0 var(--space-3); }
+.sec-form { max-width: 420px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.sec-form .field { align-self: stretch; margin-bottom: 0; }
+.input--code, .sec-key, .sec-recovery { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; }
+.sec-qr { width: 240px; max-width: 100%; margin: 0 0 var(--space-4); }
+.sec-qr svg { display: block; width: 100%; height: auto; }
+.sec-key { font-size: 20px; font-weight: 600; margin: 0 0 var(--space-5); word-break: break-word; }
+.sec-recovery { font-size: 20px; columns: 2; column-gap: var(--space-8); margin: 0 0 var(--space-5); }
+.sec-recovery li { margin: 0 0 6px; white-space: nowrap; }
+@media (max-width: 600px) { .sec-recovery { columns: 1; } }
+@media print {   /* "Print them" prints the recovery codes and nothing else */
+  body * { visibility: hidden; }
+  .sec-print, .sec-print * { visibility: visible; }
+  .sec-print { position: absolute; top: 0; left: 0; }
+}

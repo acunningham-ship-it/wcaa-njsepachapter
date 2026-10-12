@@ -21,7 +21,8 @@ import { signToken, makeSessionCookie } from '../functions/api/_lib.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // Every migration, in the order /api/migrate applies them — the schema is their sum.
-const FILES = ['migrations/0001_rsvps.sql', 'migrations/0002_links_and_limits.sql', 'migrations/0003_attendee_list.sql'];
+const FILES = ['migrations/0001_rsvps.sql', 'migrations/0002_links_and_limits.sql', 'migrations/0003_attendee_list.sql',
+  'migrations/0004_admin_2fa.sql'];
 const FILE_SQL = Object.fromEntries(FILES.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]));
 const SQL = FILES.map((f) => FILE_SQL[f]).join('\n');
 
@@ -78,8 +79,8 @@ const schemaOf = (db) => {
   /* And the objects themselves match by name and type, so the pragma comparison
      is not passing because it looked at an empty set. */
   const names = (db) => db.prepare("SELECT type || ':' || name AS k FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY k").all().map((r) => r.k);
-  ok('both databases contain the same eleven objects (6 tables, 5 indexes)',
-     JSON.stringify(names(split)) === JSON.stringify(names(whole)) && names(whole).length === 11, names(whole));
+  ok('both databases contain the same twelve objects (7 tables, 5 indexes)',
+     JSON.stringify(names(split)) === JSON.stringify(names(whole)) && names(whole).length === 12, names(whole));
   ok('no statement still contains a semicolon', statements.every((s) => !s.includes(';')));
   ok('comments were stripped', statements.every((s) => !/^\s*--/m.test(s)));
 
@@ -150,7 +151,7 @@ const schemaOf = (db) => {
   r = await call('GET', { DB });
   ok('GET reports the schema is not applied yet', r.status === 200 && r.json.applied === false, r.json);
   ok('  ...and names what is missing',
-     JSON.stringify(r.json.missing) === JSON.stringify(['events', 'rsvps', 'contact_messages', 'event_links', 'rate_hits', 'rsvp_listed']), r.json);
+     JSON.stringify(r.json.missing) === JSON.stringify(['events', 'rsvps', 'contact_messages', 'event_links', 'rate_hits', 'rsvp_listed', 'admin_2fa']), r.json);
 
   r = await call('POST', { DB });
   ok('POST applies the migration', r.status === 200 && r.json.ok === true, r.json);

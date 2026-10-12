@@ -892,12 +892,21 @@ async function signIn(event) {
   event.preventDefault();
   const error = $('#signin-error');
   error.textContent = '';
+  error.className = 'status status--bad';
+  const creds = { username: $('#username').value, password: $('#password').value };
+  if (!$('#code-field').hidden) creds.code = $('#code').value;
   const res = await fetch('../api/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: $('#username').value, password: $('#password').value }),
+    body: JSON.stringify(creds),
   }).catch(() => null);
   const body = res ? await res.json().catch(() => ({})) : {};
+  if (body.need2fa) {   // the password was right; the sign-in code (2FA) is on
+    if (!('code' in creds)) error.className = 'status';   // the first ask is a prompt, not an error
+    $('#code-field').hidden = false;
+    $('#code').value = '';
+    $('#code').focus();
+  }
   if (!res || !res.ok || !body.ok) { error.textContent = body.error || 'That didn’t work. Please try again.'; return; }
   if (location.search) history.replaceState(null, '', location.pathname);   // drop "?logged-out"
   /* Signed back in after the session ran out mid-edit: go back to their unsaved changes. start()
@@ -915,13 +924,15 @@ function setMode(m) {
   const content = m === 'content';
   $('#content-view').hidden = !content;
   $('#savebar').hidden = !content;
-  $('#events-view').hidden = content;
+  $('#events-view').hidden = m !== 'events';
+  $('#security-view').hidden = m !== 'security';
   if (!content) { state.drawer = null; renderDrawer(); }
-  for (const [id, on] of [['#mode-content', content], ['#mode-events', !content]]) {
-    $(id).classList.toggle('is-on', on);
-    $(id).setAttribute('aria-pressed', on ? 'true' : 'false');
+  for (const k of ['content', 'events', 'security']) {
+    $('#mode-' + k).classList.toggle('is-on', k === m);
+    $('#mode-' + k).setAttribute('aria-pressed', k === m ? 'true' : 'false');
   }
-  if (!content) loadEvents();
+  if (m === 'events') loadEvents();
+  if (m === 'security') loadSecurity();
 }
 
 const when = (iso) => {
@@ -1035,6 +1046,132 @@ async function loadRsvps(ev, box) {
   box.append(el('div', { className: 'ev-table-wrap' }, table));
 }
 
+/* ---------- the sign-in code (2FA) ----------
+   functions/api/2fa.js. The chapter shares ONE editor login, so there is one code: every officer scans
+   the same square on their own phone. Nothing changes until a code from the app is typed back in, so a
+   setup left halfway never locks anyone out. */
+
+async function call2fa(body) {
+  const res = await fetch('../api/2fa', body
+    ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+    : {}).catch(() => null);
+  const data = res ? await res.json().catch(() => ({})) : {};
+  return data.ok ? data : { ok: false, error: data.error || 'That didn’t work. Please check your connection and try again.' };
+}
+const secField = (label, input) => el('label', { className: 'field' }, [el('span', { className: 'field-label', textContent: label }), input]);
+const passwordInput = () => el('input', { className: 'input', type: 'password', autocomplete: 'current-password' });
+const codeInput = () => el('input', { className: 'input input--code', type: 'text', inputMode: 'numeric', autocomplete: 'one-time-code', spellcheck: false });
+
+/* A small form: its fields, one button, and a line for what went wrong (onSubmit returns that text). */
+function secForm(fields, label, onSubmit, btnClass = 'btn btn--primary') {
+  const msg = el('p', { className: 'status status--bad' });
+  msg.setAttribute('role', 'alert');
+  const btn = el('button', { className: btnClass, type: 'submit', textContent: label });
+  const form = el('form', { className: 'sec-form' }, [...fields, btn, msg]);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    btn.disabled = true;
+    const err = await onSubmit().catch(() => 'That didn’t work. Please try again.');
+    btn.disabled = false;
+    if (err) msg.textContent = err;
+  });
+  return form;
+}
+
+function scanBlock(r) {
+  const qr = el('div', { className: 'sec-qr' });
+  if (typeof qrcode === 'function') {   // vendor/qrcode.js. If it didn't load, the typed key below still works.
+    const q = qrcode(0, 'M');
+    q.addData(r.uri);
+    q.make();
+    qr.innerHTML = q.createSvgTag({ cellSize: 6, margin: 4, scalable: true, title: 'Square to scan with your authenticator app' });
+  }
+  return el('div', { className: 'sec-scan' }, [
+    el('p', { className: 'hint', textContent: 'Open the authenticator app, tap + (or “Add account”), and point the phone’s camera at this square.' }),
+    qr,
+    el('p', { className: 'hint', textContent: 'Can’t scan it? Choose “Enter a setup key” in the app, name it WCAA website, and type:' }),
+    el('p', { className: 'sec-key', textContent: r.secret.match(/.{1,4}/g).join(' ') }),
+  ]);
+}
+
+async function loadSecurity() {
+  const view = $('#security-view');
+  view.textContent = 'Loading…';
+  const s = await call2fa();
+  view.textContent = '';
+  view.append(el('h1', { className: 'ev-h', textContent: 'Sign-in code' }));
+  const say = (text, className = 'hint') => view.append(el('p', { className, textContent: text }));
+  if (!s.ok) return say(s.error);
+  if (!s.ready) return say('The website’s database needs a one-time update before the sign-in code can be switched on. Please ask your web person.');
+
+  if (!s.on) {
+    say('Right now, signing in to the editor takes the username and password only. With the sign-in code on, it also asks for a 6-digit code from an app on your phone, so a password that was guessed or stolen isn’t enough on its own.');
+    say('Before you start, put a free authenticator app on your phone: Google Authenticator or Microsoft Authenticator. Everyone who signs in to the editor scans the same square, so have their phones nearby too.');
+    const pw = passwordInput();
+    view.append(secForm([secField('Your editor password', pw)], 'Show the square to scan', async () => {
+      const r = await call2fa({ action: 'start', password: pw.value });
+      if (!r.ok) return r.error;
+      showSetup(view, r);
+    }));
+    return;
+  }
+
+  say('The sign-in code is on. Signing in asks for the username, the password and the 6-digit code from the authenticator app.');
+  say(`Recovery codes left: ${s.recovery_left} of 10.` + (s.recovery_left <= 3
+    ? ' That’s running low. Switching the code off and on again gives a fresh set (and everyone scans again).' : ''));
+
+  view.append(el('h2', { className: 'sec-h', textContent: 'Add another officer’s phone' }));
+  const pw1 = passwordInput(), c1 = codeInput(), out = el('div');
+  view.append(secForm([secField('Your editor password', pw1), secField('Code from your app (or a recovery code)', c1)], 'Show the square to scan', async () => {
+    const r = await call2fa({ action: 'start', password: pw1.value, code: c1.value });
+    if (!r.ok) return r.error;
+    out.textContent = '';
+    out.append(scanBlock(r));
+  }), out);
+
+  view.append(el('h2', { className: 'sec-h', textContent: 'Switch the sign-in code off' }));
+  say('Signing in goes back to the password only, and every phone’s codes and every recovery code stop working.');
+  const pw2 = passwordInput(), c2 = codeInput();
+  view.append(secForm([secField('Your editor password', pw2), secField('Code from your app (or a recovery code)', c2)], 'Switch it off', async () => {
+    if (!confirm('Switch the sign-in code off? Signing in will take the password only.')) return;
+    const r = await call2fa({ action: 'off', password: pw2.value, code: c2.value });
+    if (!r.ok) return r.error;
+    loadSecurity();
+  }, 'btn btn--danger'));
+}
+
+function showSetup(view, r) {
+  view.textContent = '';
+  view.append(el('h1', { className: 'ev-h', textContent: 'Set up the sign-in code' }), scanBlock(r));
+  view.append(el('p', { className: 'hint', textContent: 'Then type the 6-digit code the app now shows for WCAA website. Until you do, nothing changes: signing in still takes the password only.' }));
+  const code = codeInput();
+  view.append(secForm([secField('Code from the app', code)], 'Turn on the sign-in code', async () => {
+    const c = await call2fa({ action: 'confirm', code: code.value });
+    if (!c.ok) return c.error;
+    showRecovery(view, c.recovery_codes);
+  }));
+  code.focus();
+}
+
+function showRecovery(view, codes) {
+  view.textContent = '';
+  view.append(
+    el('h1', { className: 'ev-h', textContent: 'The sign-in code is on' }),
+    el('p', { className: 'hint', textContent: 'From now on, signing in asks for the code from the app too.' }),
+    el('p', { className: 'field-hint field-hint--warn', textContent: 'Save these recovery codes now. They’re the way in if a phone is lost or replaced, each one works once, and they won’t be shown again. Print them or write them down, and keep them somewhere safe, away from this computer.' }),
+    el('div', { className: 'sec-print' }, [
+      el('h2', { className: 'sec-h', textContent: 'WCAA website editor: recovery codes' }),
+      el('ol', { className: 'sec-recovery' }, codes.map((c) => el('li', { textContent: c }))),
+    ]),
+  );
+  const print = el('button', { className: 'btn btn--quiet', type: 'button', textContent: 'Print them' });
+  print.addEventListener('click', () => window.print());
+  const done = el('button', { className: 'btn btn--primary', type: 'button', textContent: 'I’ve saved them' });
+  done.addEventListener('click', loadSecurity);
+  view.append(el('div', { className: 'ev-actions' }, [print, done]));
+}
+
 /* ---------- boot ---------- */
 
 function fillPageSelect() {
@@ -1082,6 +1219,7 @@ $('#status').addEventListener('click', () => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.drawer) closeDrawer(); });
 $('#mode-content').addEventListener('click', () => setMode('content'));
 $('#mode-events').addEventListener('click', () => setMode('events'));
+$('#mode-security').addEventListener('click', () => setMode('security'));
 
 /* The session cookie is HttpOnly, so the page cannot read it. /api/session is the
    honest way to ask — rather than probing some other endpoint and inferring the

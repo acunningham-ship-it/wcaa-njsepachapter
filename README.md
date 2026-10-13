@@ -87,6 +87,8 @@ the endpoint is right.
 | `GET /api/rsvps` | officer | the registration list (`?format=csv`) |
 | `POST /api/rsvps/delete` | officer | remove a registration |
 | `GET/POST /api/messages` | officer | read, mark handled, delete |
+| `POST /api/email` | officer | email everyone registered for an event (one message, all in BCC) |
+| `POST /api/logout` | anyone | sign out: clears the cookie and kills that session token on the server |
 | `GET/POST /api/migrate` | officer | check / apply the database schema |
 
 **The two public endpoints make zero GitHub calls.** Everything else on this site
@@ -103,6 +105,18 @@ disabled for a month.
 
 **The RSVP and contact forms need JavaScript**, because the Turnstile widget does.
 The six content pages ship none.
+
+### Emailing everyone who registered
+
+**Email everyone** (Event sign-ups → the event's list) sends ONE message through [Resend](https://resend.com)'s
+HTTP API (a Worker can't speak SMTP). Everyone is in BCC, so nobody sees anyone else's address; the To is the
+reply-to officer, who therefore gets a copy; replies go to her; the line "For any inquiries, email …" is added
+by the server to every send; each press of Send is logged in `email_sends` (who, when, subject, how many).
+It needs, as Cloudflare Pages **secrets/variables**: `RESEND_API_KEY` (secret, required), and optionally
+`EMAIL_FROM` (default `WCAA NJ/SEPA Chapter <notifications@wcaa-njsepachapter.com>`) and `EMAIL_REPLY_TO`
+(default `dcanney@verizon.net`). Without the key the button answers "Email isn't set up on the website yet".
+Resend takes 50 addresses per message, so a list over 49 is refused rather than split. One-time DNS setup:
+`~/reports/wcaa-email-setup-2026-10-13.md` (kept outside the repo).
 
 ### Setting up the database
 

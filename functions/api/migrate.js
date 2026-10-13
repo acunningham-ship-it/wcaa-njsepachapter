@@ -25,8 +25,9 @@
 import { json, requireSession } from './_lib.js';
 
 const MIGRATIONS = ['migrations/0001_rsvps.sql', 'migrations/0002_links_and_limits.sql', 'migrations/0003_attendee_list.sql',
-  'migrations/0004_admin_2fa.sql'];
-const EXPECTED_TABLES = ['events', 'rsvps', 'contact_messages', 'event_links', 'rate_hits', 'rsvp_listed', 'admin_2fa'];
+  'migrations/0004_admin_2fa.sql', 'migrations/0005_email_and_logout.sql'];
+const EXPECTED_TABLES = ['events', 'rsvps', 'contact_messages', 'event_links', 'rate_hits', 'rsvp_listed', 'admin_2fa',
+  'revoked_sessions', 'email_sends'];
 
 /* D1's exec() only handles one statement per line, and a readable migration is
    not written that way. Strip line comments, then split on semicolons — safe for

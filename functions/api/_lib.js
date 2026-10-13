@@ -115,7 +115,19 @@ export async function requireSession(context) {
   if (!env.SESSION_SECRET) return null;
   const token = getCookie(request, COOKIE_NAME);
   if (!token) return null;
-  return verifyToken(token, env.SESSION_SECRET);
+  const payload = await verifyToken(token, env.SESSION_SECRET);
+  if (!payload) return null;
+  /* A token the officer logged out is dead on the server too (functions/api/logout.js). If the database
+     can't be read (migration 0005 not applied, or D1 down) this fails OPEN: the editor commits to GitHub
+     and has always kept working with D1 down (tools/test-save.mjs), and a D1 outage must not lock the
+     officers out of their own site. The cost is that a logged-out token revives for the length of an
+     outage, which also needs someone to be holding a copy of it. */
+  if (env.DB) {
+    try {
+      if (await env.DB.prepare('SELECT 1 AS x FROM revoked_sessions WHERE token_hash = ?').bind(await sha256Hex(token)).first()) return null;
+    } catch { /* see above */ }
+  }
+  return payload;
 }
 
 /* ---------- env ---------- */

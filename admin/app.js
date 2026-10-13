@@ -875,16 +875,21 @@ function showSignIn() {
 }
 
 /* ---------- logging out ----------
-   Clears the session cookie (functions/api/logout.js), then RELOADS the page instead of just
-   hiding the editor: the sign-ups screen holds people's emails and phone numbers, and on a
-   shared computer none of that should stay in the page. replace() also takes this page out of
-   the Back button, so nobody can step back into it. */
+   Ends the session on the server AND clears the cookie (functions/api/logout.js), then LEAVES the
+   editor for the public home page instead of just hiding it: the sign-ups screen holds people's
+   emails and phone numbers, and on a shared computer none of that should stay in the page.
+   replace() also takes this page out of the Back button, so nobody can step back into it.
+   '/' is the site's own home, i.e. https://wcaa-njsepachapter.com/ on the live site. */
 async function logOut() {
   if (state.dirty && !confirm('You have changes that aren’t saved yet. Log out anyway and lose them?')) return;
   const res = await fetch('../api/logout', { method: 'POST' }).catch(() => null);
-  if (!res || !res.ok) { alert('Logging out didn’t work. Please try again, or close this browser window.'); return; }
+  if (!res || !res.ok) {
+    const body = res ? await res.json().catch(() => ({})) : {};
+    alert(body.error || 'Logging out didn’t work. Please try again, or close this browser window.');
+    return;
+  }
   state.dirty = false;   // the unsaved-changes question has just been answered
-  location.replace(location.pathname + '?logged-out');
+  location.replace('/');
 }
 function showApp() { $('#signin').hidden = true; $('#app').hidden = false; }
 
@@ -1014,11 +1019,16 @@ async function loadRsvps(ev, box) {
   const head = el('div', { className: 'ev-rsvps-head' }, [
     el('p', { className: 'ev-count', textContent: `${rsvps.length} ${rsvps.length === 1 ? 'person' : 'people'} registered` }),
   ]);
+  const composer = el('div', { className: 'ev-email', hidden: true });
   if (rsvps.length) {
     head.append(el('a', { className: 'btn btn--quiet', href: '../api/rsvps?format=csv&event_id=' + encodeURIComponent(ev.id),
       textContent: 'Download the list (spreadsheet)' }));
+    const open = el('button', { className: 'btn btn--primary', type: 'button', textContent: 'Email everyone' });
+    open.addEventListener('click', () => { composer.hidden = !composer.hidden; if (!composer.hidden) composer.querySelector('input').focus(); });
+    head.append(open);
+    composer.append(emailForm(ev, rsvps.length, composer));
   }
-  box.append(head);
+  box.append(head, composer);
   if (!rsvps.length) { box.append(el('p', { className: 'empty', textContent: 'Nobody has registered yet.' })); return; }
   const table = el('table', { className: 'ev-table' });
   table.append(el('thead', {}, el('tr', {}, ['Name', 'Phone', 'Email', 'Registered', ''].map((h) => el('th', { scope: 'col', textContent: h })))));
@@ -1044,6 +1054,32 @@ async function loadRsvps(ev, box) {
   }
   table.append(tb);
   box.append(el('div', { className: 'ev-table-wrap' }, table));
+}
+
+/* ---------- email everyone who registered ----------
+   functions/api/email.js. One message; everyone is hidden from each other (BCC), replies go to the
+   chapter's reply address, and the server adds the "for any inquiries" line itself. The count in the
+   confirmation is the number of people on the list, and the result shown is the server's. */
+function emailForm(ev, count, host) {
+  const subject = el('input', { className: 'input', type: 'text', maxLength: 150, autocomplete: 'off' });
+  const message = el('textarea', { className: 'input', rows: 8 });
+  const who = `${count} ${count === 1 ? 'person' : 'people'}`;
+  const form = secForm([
+    el('p', { className: 'hint', textContent: `This sends one email to everyone who registered for “${ev.title}” (${who}). They can’t see each other’s addresses. Replies come to the chapter’s reply address, and a line with it is added at the bottom for you.` }),
+    secField('Subject', subject),
+    secField('Message (paste the Zoom link here)', message),
+  ], `Send to ${who}`, async () => {
+    if (!subject.value.trim() || !message.value.trim()) return 'Please write a subject and a message.';
+    if (!confirm(`Send this email to ${who} now? It can’t be taken back.`)) return '';
+    const res = await fetch('../api/email', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ event_id: ev.id, subject: subject.value, message: message.value }) }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (!res || !out.ok) return out.error || 'That didn’t work, so nothing was sent. Please check your connection and try again.';
+    host.textContent = '';
+    host.append(el('p', { className: 'status status--good', role: 'status', textContent: `Sent to ${out.recipients} ${out.recipients === 1 ? 'person' : 'people'}.` }));
+    return '';
+  });
+  return form;
 }
 
 /* ---------- the sign-in code (2FA) ----------

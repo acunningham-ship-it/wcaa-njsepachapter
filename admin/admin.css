@@ -246,3 +246,6 @@ textarea.input { resize: vertical; }
   .sec-print, .sec-print * { visibility: visible; }
   .sec-print { position: absolute; top: 0; left: 0; }
 }
+
+.ev-email { margin: 0 0 var(--space-5); }
+.ev-email .sec-form { max-width: 560px; }

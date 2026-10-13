@@ -39,9 +39,9 @@
    NAMES shown = first name + last initial ("Sarah M."), built HERE from rsvps.name
    by the SAME displayName() the public who's-going list uses (attendees.js) — one
    formatter, so the two cannot drift. A value that isn't plainly a name is left off
-   rather than shown, exactly as there. This lists EVERYONE registered, not only the
-   people who opted into the public who's-going card: here the gate (a proven fellow
-   registrant, or "public" mode) is the audience limit, not the opt-in tick. */
+   rather than shown, exactly as there. Only people who ticked "show my name" are on
+   it (the opt-in, see the roster query below); the gate (a proven fellow registrant,
+   or "public" mode) limits who can SEE the list and the link. */
 import { json } from './_lib.js';
 import { safeMeetingUrl } from '../../js/render.js';
 import { displayName } from './attendees.js';

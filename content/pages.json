@@ -342,6 +342,17 @@
               "gap": "var(--space-5)",
               "items": [
                 {
+                  "month": "Oct ",
+                  "day": "14",
+                  "title": "Admin Test Event",
+                  "badge": "Zoom",
+                  "time": "1:11 AM",
+                  "location": "Earth",
+                  "description": "Testing event",
+                  "register": true,
+                  "id": "oct-14-admin-test-event"
+                },
+                {
                   "month": "October",
                   "day": "15TH",
                   "title": "SOMFY Zigbee Motorization                                                           with Anthony Del Rey",

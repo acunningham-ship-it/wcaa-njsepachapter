@@ -37,6 +37,20 @@
     if (node) node.hidden = true;
   }
 
+  /* This browser remembers who registered for which event ({ email } under
+     wcaa-registered:<event id>, the same key js/registrants.js reads), so coming back shows
+     "You're registered" and the meeting link instead of the form again (judge #11487). It only
+     saves typing: the link still comes from the server's email + Turnstile check. Storage can
+     be off or throw; then nothing is remembered and the page works as before. */
+  var KEY = 'wcaa-registered:';
+  function remembered(id) {
+    try {
+      var v = JSON.parse(localStorage.getItem(KEY + id) || 'null');
+      return v && typeof v.email === 'string' ? v.email : '';
+    } catch (e) { return ''; }
+  }
+  function remember(id, email) { try { localStorage.setItem(KEY + id, JSON.stringify({ email: email })); } catch (e) { /* not remembered */ } }
+
   /* register.html: the event comes from the address (?event=<id>) and its details from the JSON
      the page carries. An id that isn't there leaves the "Choose an event first" panel up and the
      form hidden — there is nothing to register for. */
@@ -52,7 +66,27 @@
       show('reg-title', regEvent.title);
       show('reg-when', [regEvent.when, regEvent.where].filter(Boolean).join(' · '));
       hide('reg-missing');
-      document.getElementById('reg-form').hidden = false;
+      var already = remembered(wanted);
+      var panel = document.getElementById('reg-already');
+      if (already && panel) {
+        /* Registered from this browser already: say so, and let js/registrants.js open the link
+           (its button carries this event; the email it sends is the remembered one). */
+        show('reg-already-title', regEvent.title);
+        show('reg-already-email', already);
+        var open = document.getElementById('reg-already-show');
+        open.setAttribute('data-registrants', wanted);
+        open.setAttribute('data-event-title', regEvent.title);
+        panel.hidden = false;
+        document.getElementById('reg-someone').addEventListener('click', function () {
+          panel.hidden = true;
+          var form = document.getElementById('reg-form');
+          form.reset();
+          form.hidden = false;
+          document.getElementById('reg-name').focus();
+        });
+      } else {
+        document.getElementById('reg-form').hidden = false;
+      }
     }
   }
 
@@ -61,6 +95,8 @@
      the day and this page is the only place it appears. */
   function registered(form, body) {
     form.hidden = true;
+    var email = form.elements.email ? String(form.elements.email.value || '').trim() : '';
+    if (regEvent && email) remember(document.getElementById('reg-id').value, email);
     show('reg-done-title', regEvent ? regEvent.title : 'this event');
     show('reg-done-when', regEvent ? [regEvent.when, regEvent.where].filter(Boolean).join(' · ') : '');
     var join = document.getElementById('reg-join');

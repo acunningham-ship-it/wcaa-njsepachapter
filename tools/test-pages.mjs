@@ -448,6 +448,7 @@ const content = JSON.parse(read('content/pages.json'));
   };
   const strip = (s) => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
+  const FORMS_JS = readFileSync(join(ROOT, 'js/forms.js'), 'utf8');
   const inertIn = (html) => {
     const dead = [];
     /* A button is live only if it submits a form the site can actually send.
@@ -460,8 +461,12 @@ const content = JSON.parse(read('content/pages.json'));
     for (const m of html.matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)) {
       const openTag = '<button' + m[1] + '>';
       const type = attrOf(openTag, 'type') || 'submit';
+      /* A button js/forms.js wires BY ID (register.html's "Register someone else"): live only if the
+         page loads forms.js AND forms.js really attaches a click handler to that id. */
+      const id = attrOf(openTag, 'id');
       const live = (type === 'submit' && wired) ||
-                   (attrOf(openTag, 'data-registrants') !== null && registrantsWired);
+                   (attrOf(openTag, 'data-registrants') !== null && registrantsWired) ||
+                   (id !== null && html.includes('js/forms.js') && FORMS_JS.includes("getElementById('" + id + "').addEventListener('click'"));
       if (!live) dead.push(strip(m[2]));
     }
     for (const m of html.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)) {

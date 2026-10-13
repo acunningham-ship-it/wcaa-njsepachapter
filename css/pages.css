@@ -122,6 +122,11 @@
 /* Who's going, under an event's Register button (js/going.js fills it). */
 .wcaa-ev__going { margin: 12px 0 0; font-size: 18px; line-height: 1.5; color: var(--text-body); }
 .wcaa-ev__going[hidden] { display: none; }
+/* "You're registered" on a card this browser registered from (js/registrants.js), and the Register
+   button it hides: a .wcaa-btn's display beats the bare [hidden] attribute, so say it here. */
+.wcaa-ev__actions [hidden] { display: none; }
+.wcaa-ev__mine { margin: 12px 0 0; font-size: 18px; line-height: 1.5; color: var(--text-body); overflow-wrap: anywhere; }
+.wcaa-ev__notyou { background: none; border: 0; padding: 0; font: inherit; color: var(--blue-800); text-decoration: underline; cursor: pointer; }
 .wcaa-reg__url { word-break: break-all; font-weight: 600; color: var(--text-heading); }
 .wcaa-reg .wcaa-form__msg { font-size: 18px; }
 @media (max-width: 600px) { .wcaa-reg__panel { padding: var(--space-6) var(--space-5); } }

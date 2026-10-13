@@ -140,9 +140,15 @@ function formField(id, label, name, type, placeholder, required, extra) {
    fails closed — leaving a chapter officer to debug a form that is "broken" for
    no visible reason. With no key the form still renders and still refuses; the
    difference is that the refusal is honest rather than mysterious. */
-function turnstileWidget(site) {
+/* The PUBLIC Turnstile site key from site.json, or '' when it isn't a well-formed one. */
+function turnstileKey(site) {
   const key = site && typeof site.turnstileSiteKey === 'string' ? site.turnstileSiteKey.trim() : '';
-  if (!/^[A-Za-z0-9_-]{8,64}$/.test(key)) return '';
+  return /^[A-Za-z0-9_-]{8,64}$/.test(key) ? key : '';
+}
+
+function turnstileWidget(site) {
+  const key = turnstileKey(site);
+  if (!key) return '';
   return '<div class="cf-turnstile" data-sitekey="' + attr(key) + '" style="margin-bottom:var(--space-4)"></div>';
 }
 
@@ -305,8 +311,7 @@ const BLOCKS = {
            already in the page HTML on every form), and the gated email check needs it to run the
            same bot challenge the sign-up form does; js/registrants.js renders the widget in the
            dialog and loads the Turnstile script on demand. */
-        const tkey = site && typeof site.turnstileSiteKey === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(site.turnstileSiteKey.trim())
-          ? site.turnstileSiteKey.trim() : '';
+        const tkey = turnstileKey(site);
         const registrants = reg
           ? '<button type="button" class="wcaa-btn wcaa-btn--outline wcaa-btn--lg wcaa-ev__registrants"' +
             ' data-registrants="' + attr(e.id) + '" data-event-title="' + attr(e.title) + '"' +
@@ -882,14 +887,25 @@ export function renderRegisterPage(content, site) {
     '<a class="wcaa-btn wcaa-btn--primary wcaa-btn--lg" id="reg-join" target="_blank" rel="noreferrer" hidden>Join the meeting</a>' +
     '<p class="wcaa-reg__lead" id="reg-join-note" hidden>Save this link, you’ll use it to join on the day: ' +
     '<span class="wcaa-reg__url" id="reg-join-url"></span><br>' +
-    'Lost it? Register again with the same email and it will show here again.</p>' +
+    'Lost it? Come back to the events page: this browser remembers you’re registered and shows it there. ' +
+    'On another phone or computer, press “List of registrants” and enter this email.</p>' +
     '<a class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" href="' + back + '">Back to the events</a></div>' +
+    /* Registered from this browser already (js/forms.js reads what it remembered): no form, the
+       link one tap away through the same email + bot check (js/registrants.js), or a new form for
+       someone else. Hidden unless the script shows it, so without JS nothing changes. */
+    '<div class="wcaa-reg__panel" id="reg-already" tabindex="-1" hidden>' +
+    '<h2 class="wcaa-reg__title">You’re already registered for <span id="reg-already-title"></span></h2>' +
+    '<p class="wcaa-reg__lead">This browser remembers you registered as <strong id="reg-already-email"></strong>.</p>' +
+    '<button type="button" class="wcaa-btn wcaa-btn--primary wcaa-btn--lg" id="reg-already-show" data-registrants=""' +
+    (turnstileKey(site) ? ' data-turnstile-key="' + attr(turnstileKey(site)) + '"' : '') + '>Show my meeting link</button>' +
+    '<button type="button" class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" id="reg-someone">Register someone else</button></div>' +
     '<script type="application/json" id="reg-events">' + JSON.stringify(events).replace(/</g, '\\u003c') + '</script>' +
     '</div></div></section>';
   return documentFor(site, {
     title: 'Register for an event — ' + (site.title || ''),
     navHref: back,
     hasForm: true,
+    hasRegistrants: true,   // the "already registered" panel's button
     hero: renderHero({ variant: 'page', title: 'Event registration' }),
     body,
   });

@@ -66,6 +66,10 @@
                   "icon": "assets/icons/map-pin.svg",
                   "title": "Local to Our Region",
                   "text": "Serving Southeastern Pennsylvania and New Jersey, with events close to home."
+                },
+                {
+                  "title": "Current Announcements",
+                  "text": "Please see here for meeting links "
                 }
               ]
             }

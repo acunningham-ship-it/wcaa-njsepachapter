@@ -433,7 +433,8 @@
       "hero": {
         "variant": "page",
         "kicker": "Chapter Life",
-        "title": "Gallery"
+        "title": "Gallery",
+        "actions": []
       },
       "sections": [
         {
@@ -478,6 +479,9 @@
                 {
                   "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_3.webp",
                   "alt": "Fabric warehouse tour"
+                },
+                {
+                  "src": "Chapter trip to Samuel & Sons "
                 },
                 {
                   "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__1.webp",

@@ -4,11 +4,11 @@ Real admin/app.js in real Chromium; /api/upload is the real functions/api/upload
 Run: python3 tools/e2e-photo-upload.py   (needs python playwright + node). Exit 0 = pass.
 Why it exists: 2026-10-18, photos "added" in the editor were committed to uploads/ but never reached the page (the editor read
 body.path, the endpoint answers body.src, so the field was set to undefined and the blank entry was pruned on Save)."""
-import json, os, subprocess, sys, time, urllib.request
+import json, os, socket, subprocess, sys, time, urllib.request
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-PORT = 8799
+with socket.socket() as _s: _s.bind(("127.0.0.1", 0)); PORT = _s.getsockname()[1]   # a free port, never a stale server's
 BASE = f"http://127.0.0.1:{PORT}"
 JPEG = bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"\x00" * 64   # passes the endpoint's magic-byte check; the preview doesn't need to decode it
 fails = 0

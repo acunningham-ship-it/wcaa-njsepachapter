@@ -40,6 +40,8 @@ try:
         committed = [x for x in state()["ghPuts"] if x.startswith("uploads/")]
         ok("the upload committed one image under uploads/", len(committed) == 1, committed)
         ok("the editor showed no error", not alerts, alerts)
+        ok("the file box can't be typed into (an officer once typed a caption there)", not pg.is_editable("#drawer-body input.input >> nth=0"))
+        ok("the editor says the photo isn't published until Save", "Save changes" in pg.inner_text("#status"), pg.inner_text("#status"))
         pg.click("#drawer-close"); pg.wait_for_timeout(300)
         can_save = pg.is_enabled("#save")
         ok("Save changes is offered (the photo counts as a change)", can_save)

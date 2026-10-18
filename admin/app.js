@@ -528,7 +528,12 @@ function renderField(obj, spec) {
   if (spec.key === 'meetingLink') { input.inputMode = 'url'; input.placeholder = 'https://…'; }
   input.oninput = () => { obj[spec.key] = input.value; changed(); };
   const row = labelled(spec, input);
-  if (spec.kind === 'image') row.append(uploadButton(input, obj, spec.key));
+  if (spec.kind === 'image') {
+    /* The box only shows which file is in use. It was editable, and on 2026-10-17 an officer typed a photo's description into it
+       (saved as the photo's address: an empty slot on the live gallery). A photo comes from "Choose a photo…". */
+    input.readOnly = true; input.placeholder = 'No photo yet. Press “Choose a photo…”';
+    row.append(uploadButton(input, obj, spec.key));
+  }
   return row;
 }
 
@@ -615,6 +620,7 @@ function uploadButton(input, obj, key) {
       if (!res.ok || !body.ok || !body.src) throw new Error(body.error || 'Upload failed.');   // /api/upload answers { src }
       input.value = body.src;
       obj[key] = body.src;
+      state.notice = 'Photo added. It isn’t on the website yet: press “Save changes” to publish it.';
       changed({ now: true });
     } catch (e) {
       alert('That photo couldn’t be uploaded. ' + (e.message || ''));

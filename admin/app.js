@@ -612,9 +612,9 @@ function uploadButton(input, obj, key) {
       form.append('dest', 'site');
       const res = await fetch('../api/upload', { method: 'POST', body: form });
       const body = await res.json();
-      if (!res.ok || !body.ok) throw new Error(body.error || 'Upload failed.');
-      input.value = body.path;
-      obj[key] = body.path;
+      if (!res.ok || !body.ok || !body.src) throw new Error(body.error || 'Upload failed.');   // /api/upload answers { src }
+      input.value = body.src;
+      obj[key] = body.src;
       changed({ now: true });
     } catch (e) {
       alert('That photo couldn’t be uploaded. ' + (e.message || ''));

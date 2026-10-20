@@ -108,7 +108,20 @@
                 {
                   "type": "events",
                   "gap": "var(--space-4)",
-                  "items": []
+                  "items": [
+                    {
+                      "month": "November 1, 2026",
+                      "day": "Sunday",
+                      "title": "Holiday Brunch",
+                      "badge": "In Person",
+                      "time": "11am - 2pm",
+                      "location": "Barrell and Roost  160 Route 35 South in Redbank, NJ. 07701",
+                      "meetingPublic": true,
+                      "register": true,
+                      "id": "november-1-2026-sunday-holiday-brunch",
+                      "description": "Please join us for our NJ/SEPA chapter Holiday Brunch. \nBring a $20.00 gift for exchange"
+                    }
+                  ]
                 }
               ]
             }

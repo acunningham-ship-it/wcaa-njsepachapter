@@ -355,6 +355,17 @@
               "gap": "var(--space-5)",
               "items": [
                 {
+                  "month": "NOVEMBER ",
+                  "day": "1",
+                  "title": "HOLIDAY BRUNCH",
+                  "badge": "IN PERSON",
+                  "time": "11:00 AM -2:00 PM",
+                  "location": "BARREL AND ROOST  160 ROUTE 35 SOUTH REDBANK NEW JERSEY 07701",
+                  "description": "✨Join us for a delicious Holiday Brunch !!🥂🍽️🌿 Barrel and Roost                                                                                                               160 Route 35 South Red Bank, NJ 07701 ✨Sunday, November 1, 2026✨ ✨11:00 am - 2:00 pm✨ Let’s get festive and enjoy an afternoon of fun & food along with a holiday gift exchange! Please bring a $20 wrapped gift!🎁 💕Looking forward to seeing our members at this event🎊 ",
+                  "register": true,
+                  "id": "november-1-holiday-brunch"
+                },
+                {
                   "month": "October",
                   "day": "15TH",
                   "title": "SOMFY Zigbee Motorization                                                           with Anthony Del Rey",

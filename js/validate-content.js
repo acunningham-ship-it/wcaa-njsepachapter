@@ -20,7 +20,7 @@
  * guess every context the value later lands in.
  */
 import { BLOCK_TYPES, EVENT_ID, eventItems } from './blocks.js';
-import { safeMeetingUrl } from './render.js';
+import { safeMeetingUrl, safeSrc, videoEmbed } from './render.js';
 
 /* A slug becomes a filename. Leading digit allowed so "404" can exist; no dots
    and no slashes, so it cannot traverse or pick its own extension. */
@@ -38,7 +38,7 @@ const RESERVED_SLUGS = ['register'];
 const TEXT_KEYS = [
   'title', 'text', 'label', 'caption', 'alt', 'kicker', 'lede', 'name', 'role', 'note',
   'heading', 'month', 'day', 'badge', 'time', 'location', 'description', 'submitLabel',
-  'n', 'phone', 'email', 'src', 'href', 'icon', 'iconAfter', 'id', 'type', 'slug', 'meetingLink',
+  'n', 'phone', 'email', 'src', 'href', 'icon', 'iconAfter', 'id', 'type', 'slug', 'meetingLink', 'image', 'video',
 ];
 
 function checkTextKeys(value, path) {
@@ -123,6 +123,11 @@ function checkEvent(e, p) {
   for (const key of ['register', 'meetingPublic']) {
     if (e[key] !== undefined && typeof e[key] !== 'boolean') return err(`${p}.${key}`, 'must be ticked or unticked.');
   }
+  /* The event's picture must be a file this site holds (the same rule the renderer applies),
+     and say so instead of quietly rendering nothing. */
+  if (e.image !== undefined && e.image !== '' && (typeof e.image !== 'string' || !safeSrc(e.image))) {
+    return err(p + '.image', 'isn’t a picture on this site. Use “Choose a photo…” to add one.');
+  }
   if (e.register && !hasId) return err(p, 'takes registrations but has no registration id. Reopen it in the editor and save again.');
   const link = typeof e.meetingLink === 'string' ? e.meetingLink.trim() : '';
   if (e.meetingLink !== undefined && typeof e.meetingLink !== 'string') return err(p + '.meetingLink', 'must be a link.');
@@ -162,6 +167,14 @@ function checkBlocks(blocks, path, depth) {
       for (let k = 0; k < b.items.length; k++) {
         const bad = checkEvent(b.items[k], `${p}.items[${k}]`);
         if (bad) return bad;
+      }
+    }
+    if (b.type === 'gallery' && Array.isArray(b.items)) {
+      for (let k = 0; k < b.items.length; k++) {
+        const v = b.items[k] && b.items[k].video;
+        if (v !== undefined && v !== '' && !videoEmbed(v)) {
+          return err(`${p}.items[${k}].video`, 'isn’t a YouTube, Facebook or Instagram video link. Paste the link from the video’s page, or clear the box.');
+        }
       }
     }
     if (b.type === 'group' || b.type === 'split') {

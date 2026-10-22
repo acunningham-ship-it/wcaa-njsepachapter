@@ -19,7 +19,7 @@
  * the default. That is the difference between a CMS that writes CSS from a menu
  * and one that writes CSS from user input.
  */
-import { esc, attr, safeHref, safeSrc, safeMeetingUrl } from './render.js';
+import { esc, attr, safeHref, safeSrc, safeMeetingUrl, videoEmbed } from './render.js';
 
 /* ---------- style-value allowlists ---------- */
 
@@ -321,6 +321,12 @@ const BLOCKS = {
         const join = meeting
           ? '<a class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" href="' + attr(meeting) + '" target="_blank" rel="noreferrer">Join the meeting</a>'
           : '';
+        /* The event's picture (usually the same image the chapter posts as a social-media ad). Same
+           safeSrc gate as every other photo, so only a file this site holds can appear. */
+        const pic = safeSrc(e.image);
+        const picture = pic
+          ? '<div class="wcaa-ev__media"><img src="' + attr(pic) + '" alt="' + attr(e.title) + '" loading="lazy"></div>'
+          : '';
         return (
           '<article class="wcaa-ev' + (href ? ' wcaa-ev--link' : '') + '"' + I(ed, i) + '>' +
           '<div class="wcaa-ev__date"><span class="wcaa-ev__mo"' + F(ie, 'month') + '>' + esc(e.month) + '</span>' +
@@ -335,7 +341,7 @@ const BLOCKS = {
           /* Who's going: an EMPTY slot that js/going.js fills from /api/attendees when the page
              is viewed. Names never enter this markup: it is committed to a public repo. */
           (reg ? '<p class="wcaa-ev__going" data-going="' + attr(e.id) + '" hidden></p>' : '') +
-          '</div></article>'
+          '</div>' + picture + '</article>'
         );
       })
       .join('');
@@ -352,10 +358,20 @@ const BLOCKS = {
         const inner = src
           ? '<img src="' + attr(src) + '" alt="' + alt + '" loading="lazy">'
           : '<span class="wcaa-gal__empty">' + (alt || 'Photo') + '</span>';
+        /* A pasted video link. NO iframe in the markup: js/video.js builds it when Play is pressed
+           (so nothing from the video site loads for a visitor who doesn't), and the plain link
+           works with JavaScript off. The embed address comes from videoEmbed, never from the paste. */
+        const v = it && videoEmbed(it.video);
+        const video = v
+          ? '<div class="wcaa-vid"><button type="button" class="wcaa-vid__play" data-embed="' + attr(v.embed) +
+            '" data-ratio="' + attr(v.ratio) + '" data-title="' + attr(it.alt || it.caption || 'Video') + '">▶ Play video</button>' +
+            '<a class="wcaa-vid__link" href="' + attr(v.watch) + '" target="_blank" rel="noopener noreferrer">Watch on ' + v.site + '</a></div>'
+          : '';
         return (
           '<figure class="wcaa-gal__item" style="margin:0"' + I(ed, i) + '>' +
           '<div class="wcaa-gal__ph" style="aspect-ratio:' + ratio + '">' + inner + '</div>' +
           (it && it.caption ? '<figcaption class="wcaa-gal__cap"' + F(itemEd(ed, i), 'caption') + '>' + esc(it.caption) + '</figcaption>' : '') +
+          video +
           '</figure>'
         );
       })
@@ -754,7 +770,7 @@ export const CANONICAL_REDIRECT = [
 ].join('\n') + '\n';
 
 /* The document shell every generated page shares. */
-function documentFor(site, { title, navHref, hasForm, hasGoing, hasRegistrants, hero, body }) {
+function documentFor(site, { title, navHref, hasForm, hasGoing, hasRegistrants, hasVideo, hero, body }) {
   return (
     '<!DOCTYPE html>\n' +
     '<html lang="en">\n<head>\n' +
@@ -779,6 +795,9 @@ function documentFor(site, { title, navHref, hasForm, hasGoing, hasRegistrants, 
        (an event taking registration). Same justification as the who's-going script: without it
        the button does nothing, which is the safe way to fail. */
     (hasRegistrants ? '<script src="js/registrants.js" defer></script>\n' : '') +
+    /* ...and the click-to-play script ONLY on a page with a video link. Without it the
+       "Watch on" link still works. */
+    (hasVideo ? '<script src="js/video.js" defer></script>\n' : '') +
     CANONICAL_REDIRECT +
     '</head>\n<body>\n' +
     renderNav(site, navHref) +
@@ -801,6 +820,7 @@ export function renderPage(page, site, opts) {
     hasForm: pageHasForm(page),
     hasGoing: !edit && body.includes(' data-going="'),
     hasRegistrants: !edit && body.includes(' data-registrants="'),
+    hasVideo: !edit && body.includes(' data-embed="'),
     hero: renderHero(page.hero, edit ? { base: 'hero' } : null),
     body,
   });

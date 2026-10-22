@@ -67,6 +67,7 @@ export const FIELDS = {
       { key: 'time', kind: 'text', label: 'Time' },
       { key: 'location', kind: 'text', label: 'Place' },
       { key: 'description', kind: 'long', label: 'Description' },
+      { key: 'image', kind: 'image', label: 'Event picture', hint: 'Optional. The picture you use to advertise the event.' },
       { key: 'href', kind: 'link', label: 'More details link', hint: 'Optional. Leave empty if there isn’t one.' },
       { key: 'register', kind: 'check', label: 'Let people register on the website',
         hint: 'Adds a “Register for this event” button. You’ll see who registered under Event sign-ups.' },
@@ -83,6 +84,7 @@ export const FIELDS = {
       { key: 'src', kind: 'image', label: 'Photo' },
       { key: 'alt', kind: 'text', label: 'Description', hint: 'For screen readers and when the photo fails to load' },
       { key: 'caption', kind: 'text', label: 'Caption' },
+      { key: 'video', kind: 'text', label: 'Video link', hint: 'Optional. Paste a YouTube, Facebook or Instagram link. Visitors see a Play button under the photo.' },
     ] },
   ],
   image: [

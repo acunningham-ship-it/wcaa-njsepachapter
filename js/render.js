@@ -96,6 +96,32 @@ export function safeMeetingUrl(value) {
   return MEETING_HOSTS.test(u.hostname) ? u.href : '';
 }
 
+/* A pasted video LINK -> { site, embed, watch, ratio }, or null. Only YouTube, Facebook and
+   Instagram are accepted, and the embed address is BUILT from the id parsed out of the link:
+   the pasted text itself is never used as an iframe src, and raw embed code is never stored.
+   The renderer (blocks.js) and the save-time validator (validate-content.js) both import THIS
+   function, so they cannot disagree. The Denise/BATS site has a twin of it in two files. */
+export function videoEmbed(v) {
+  if (typeof v !== 'string' || v.length > 500 || /[\s<>"'\\]/.test(v) || /[\u0000-\u001f\u007f]/.test(v)) return null;
+  var m = /^https:\/\/([A-Za-z0-9.-]+)(\/[^?#]*)?(\?[^#]*)?(#.*)?$/i.exec(v);
+  if (!m) return null;
+  var host = m[1].toLowerCase().replace(/^(www|m)\./, ''), path = m[2] || '/', q = m[3] || '', id;
+  if (host === 'youtube.com') {
+    id = path === '/watch' ? (/(?:^\?|&)v=([A-Za-z0-9_-]{11})(?:&|$)/.exec(q) || [])[1] : (/^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{11})\/?$/.exec(path) || [])[1];
+  } else if (host === 'youtu.be') {
+    id = (/^\/([A-Za-z0-9_-]{11})\/?$/.exec(path) || [])[1];
+  } else if (host === 'instagram.com') {
+    var ig = /^\/(p|reel|tv)\/([A-Za-z0-9_-]{5,30})\/?$/.exec(path);
+    return ig ? { site: 'Instagram', embed: 'https://www.instagram.com/' + ig[1] + '/' + ig[2] + '/embed/', watch: v, ratio: '4/5' } : null;
+  } else if (host === 'facebook.com' || host === 'fb.watch') {
+    var good = host === 'fb.watch' ? /^\/[A-Za-z0-9_-]{4,30}\/?$/.test(path)
+      : (path === '/watch' || path === '/watch/') ? /(?:^\?|&)v=[0-9]{5,25}(?:&|$)/.test(q)
+      : /^\/(?:reel\/[0-9]{5,25}|[A-Za-z0-9.]{1,80}\/videos\/(?:[^/]{1,80}\/)?[0-9]{5,25}|share\/[rv]\/[A-Za-z0-9_-]{4,30})\/?$/.test(path);
+    return good ? { site: 'Facebook', embed: 'https://www.facebook.com/plugins/video.php?show_text=false&href=' + encodeURIComponent(v.replace(/#.*$/, '')), watch: v, ratio: '16/9' } : null;
+  }
+  return id ? { site: 'YouTube', embed: 'https://www.youtube-nocookie.com/embed/' + id, watch: v, ratio: '16/9' } : null;
+}
+
 /* ---------- small helpers ---------- */
 
 /* Renders an attribute only when it has a value, so we never emit alt="" by

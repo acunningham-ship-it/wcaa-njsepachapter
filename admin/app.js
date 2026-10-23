@@ -15,6 +15,7 @@
 import { renderPage, pathKey, eventItems, newItemIndex } from '../js/blocks.js';
 import { validateContent, contentFingerprint } from '../js/validate-content.js';
 import { merge3, swapList } from './merge.js';
+import { preparePhoto } from './photo.js';
 import { FIELDS, HERO_FIELDS, ADVANCED_KEYS, BLOCK_LABELS, BLOCK_DEFAULTS, linesToText, textToLines, isSimpleLines } from './fields.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -602,31 +603,38 @@ function labelled(spec, control) {
   return row;
 }
 
+/* The file she picks is rarely what /api/upload takes (an iPhone's HEIC, a 10 MB camera JPEG, a TIFF, an SVG logo…),
+   so photo.js turns it into a JPG, PNG or WebP first. The extensions are listed so phones offer those files too. */
+const PHOTO_ACCEPT = 'image/*,.heic,.heif,.avif,.jfif,.tif,.tiff,.bmp,.gif,.svg,.ico';
+
 function uploadButton(input, obj, key) {
-  const picker = el('input', { type: 'file', accept: 'image/*', className: 'hidden-file' });
+  const picker = el('input', { type: 'file', accept: PHOTO_ACCEPT, className: 'hidden-file' });
   const button = el('button', { className: 'btn btn--quiet', type: 'button', textContent: 'Choose a photo…',
     onclick: () => picker.click() });
   picker.onchange = async () => {
     const file = picker.files && picker.files[0];
     if (!file) return;
-    button.textContent = 'Uploading…';
+    button.textContent = 'Preparing photo…';
     button.disabled = true;
     try {
+      const { photo, note } = await preparePhoto(file);
+      button.textContent = 'Uploading…';
       const form = new FormData();
-      form.append('file', file);
+      form.append('file', photo);
       form.append('dest', 'site');
       const res = await fetch('../api/upload', { method: 'POST', body: form });
       const body = await res.json();
       if (!res.ok || !body.ok || !body.src) throw new Error(body.error || 'Upload failed.');   // /api/upload answers { src }
       input.value = body.src;
       obj[key] = body.src;
-      state.notice = 'Photo added. It isn’t on the website yet: press “Save changes” to publish it.';
+      state.notice = 'Photo added. ' + (note ? note + ' ' : '') + 'It isn’t on the website yet: press “Save changes” to publish it.';
       changed({ now: true });
     } catch (e) {
       alert('That photo couldn’t be uploaded. ' + (e.message || ''));
     } finally {
       button.textContent = 'Choose a photo…';
       button.disabled = false;
+      picker.value = '';   // so choosing the same file again (after an error) still does something
     }
   };
   return el('span', { className: 'upload-wrap' }, [button, picker]);

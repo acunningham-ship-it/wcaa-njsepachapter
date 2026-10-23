@@ -156,7 +156,8 @@ src/
   ui_kits/website/         the pages (Home, About, Events, Gallery, Join, Contact),
                            Section, WebsiteApp (routing), image-slot
 build.py                   the whole build. No npm, no bundler, no toolchain.
-vendor/                    React + ReactDOM production builds, served same-origin
+vendor/                    React + ReactDOM production builds, served same-origin; plus the HEIC/TIFF decoders
+                           the site manager loads only when needed (see vendor/README.md)
 tokens/*.css, styles.css   design tokens and global styles
 uploads/                   photos (served as .webp; the .jpg originals are unreferenced)
 ```
@@ -224,3 +225,8 @@ convert in.jpg -resize '1400x1400>' -quality 82 -define webp:method=6 -strip out
 
 The `.jpg` originals under `uploads/` are no longer referenced by the site. They cost
 repo size, not page weight.
+
+Photos added in the site manager go through `admin/photo.js` first. `/api/upload` only takes JPEG, PNG or WebP up to
+6 MB, so the browser converts anything else (HEIC, AVIF, GIF, BMP, TIFF, ICO, SVG, or a JPEG over 5 MB or 2400px)
+to a JPEG (WebP if it has see-through parts), upright and at most 2400px. The file type is read from the bytes, not
+the name. Camera RAW files are refused with a message. Tested by `tools/e2e-photo-upload.py`.

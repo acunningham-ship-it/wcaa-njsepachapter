@@ -2,13 +2,13 @@
 """E2E: an officer adds a photo to the Gallery in the real editor and presses Save -> the saved content holds that photo.
 Real admin/app.js in real Chromium; /api/upload is the real functions/api/upload.js (GitHub faked), /api/save is recorded.
 Run: python3 tools/e2e-photo-upload.py   (needs python playwright + Pillow + node, and ffmpeg with libx265 to build the
-HEIC fixture). Exit 0 = pass. E2E_BROWSER=firefox runs the same checks in Firefox.
+HEIC fixture, and zstd for one TIFF). Exit 0 = pass. E2E_BROWSER=firefox runs the same checks in Firefox.
 Why it exists: 2026-10-18, photos "added" in the editor were committed to uploads/ but never reached the page (the editor read
 body.path, the endpoint answers body.src, so the field was set to undefined and the blank entry was pruned on Save).
-Then, 2026-10-23: the chapter's editor picked phone photos (HEIC, 9 MB JPEGs) that /api/upload refuses, and saw only an
+Then, 2026-10-23: the chapter's editor picked phone photos (HEIC, 9 MB JPEGs) that /api/upload refused then (6 MB cap), and saw only an
 alert. admin/photo.js now turns whatever she picks into a JPG/PNG/WebP under the limits; the second half checks that, one
 file type at a time, with fixtures made here in memory (nothing is written to the repo)."""
-import io, json, os, re, socket, struct, subprocess, sys, tempfile, time, urllib.parse, urllib.request
+import io, json, lzma, os, re, socket, struct, subprocess, sys, tempfile, time, urllib.parse, urllib.request
 from PIL import Image, ImageChops, ImageDraw, ImageStat
 from playwright.sync_api import sync_playwright
 
@@ -71,9 +71,37 @@ def heic(stored, irot=0):
     return ftyp + meta(len(ftyp) + len(meta(0)) + 8) + box(b"mdat", data)
 
 
-def camera_jpeg():   # a 6000x4000 photo of about 9 MB: the picture plus sensor-like noise, so it doesn't compress away
-    noise = Image.merge("RGB", [Image.effect_noise((6000, 4000), 20) for _ in range(3)])
-    return encode(ImageChops.add(layout(6000, 4000), noise, 1, -128), "JPEG", quality=90)
+def photo(w, h, alpha=False):   # the picture plus sensor-like noise, so it doesn't compress away
+    noise = Image.merge("RGB", [Image.effect_noise((w, h), 20) for _ in range(3)])
+    im = layout(w, h, alpha)
+    pic = ImageChops.add(im.convert("RGB"), noise, 1, -128)
+    if alpha: pic.putalpha(im.getchannel("A"))
+    return pic
+
+
+def camera_jpeg():   # a 6000x4000 photo of about 9 MB
+    return encode(photo(6000, 4000), "JPEG", quality=90)
+
+
+def one_clear_pixel():   # a 4032x3024 photo with one see-through pixel, as a PNG (~36 MB)
+    im = photo(4032, 3024).convert("RGBA"); im.putpixel((4031, 3023), (0, 0, 0, 0))
+    return encode(im, "PNG")
+
+
+def tiff(im, compression):
+    """An RGB TIFF in one strip, compressed with ZSTD (50000, via the zstd tool) or LZMA (34925, xz), which UTIF can't
+    decode. Built by hand: Pillow's libtiff here has neither codec and silently writes those uncompressed."""
+    raw = im.convert("RGB").tobytes(); w, h = im.size
+    data = lzma.compress(raw) if compression == 34925 else subprocess.run(["zstd", "-q", "-c"], input=raw, capture_output=True, check=True).stdout
+    short = lambda tag, v: struct.pack("<HHIHH", tag, 3, 1, v, 0)
+    tags = [short(256, w), short(257, h), struct.pack("<HHII", 258, 3, 3, 122), short(259, compression), short(262, 2),
+            struct.pack("<HHII", 273, 4, 1, 128), short(277, 3), short(278, h), struct.pack("<HHII", 279, 4, 1, len(data))]
+    return b"II*\0" + struct.pack("<I", 8) + struct.pack("<H", len(tags)) + b"".join(tags) + b"\0" * 4 + struct.pack("<HHH", 8, 8, 8) + data
+
+
+# Safari can't write WebP: asked for one, its canvas hands back a PNG. This makes Chromium and Firefox do the same.
+SAFARI_TOBLOB = """const tb = HTMLCanvasElement.prototype.toBlob;
+HTMLCanvasElement.prototype.toBlob = function (cb, type, q) { return tb.call(this, cb, type === 'image/webp' ? 'image/png' : type, q); };"""
 
 
 def gif_two_frames():
@@ -124,6 +152,9 @@ try:
         before = fr.locator("[data-item]").count()
         fr.locator("[data-item]").first.click()
         pg.click("text=+ Add another photo")
+        accept = pg.get_attribute("#drawer-body input[type=file]", "accept") or ""
+        ok("the picker offers image/* and no .heic/.heif (on an iPhone those change what Photos hands over)",
+           "image/*" in accept.split(",") and not re.search(r"\.hei[cf]", accept, re.I), accept)
         pg.set_input_files("#drawer-body input[type=file]", {"name": "chapter-night.jpg", "mimeType": "image/jpeg", "buffer": JPEG})
         pg.wait_for_function("!document.querySelector('#drawer-body .upload-wrap button').disabled", timeout=8000)
         committed = [x for x in state()["ghPuts"] if x.startswith("uploads/")]
@@ -146,9 +177,10 @@ try:
 
         # ---------- one file of each kind through "Choose a photo…" ----------
 
-        def pick(name, mime, data):
+        def pick(name, mime, data, init=None):
             """A fresh editor; one file into a gallery photo's picker; wait until the button is back to normal."""
             pg = b.new_page(viewport={"width": 1400, "height": 900})
+            if init: pg.add_init_script(init)
             seen = {"alerts": [], "urls": []}
             pg.on("dialog", lambda d: (seen["alerts"].append(d.message), d.dismiss()))
             pg.on("request", lambda r: seen["urls"].append(r.url))
@@ -174,8 +206,8 @@ try:
             ok(f"{label}: lands, one commit, no error", len(r["landed"]) == 1 and not r["alerts"], (len(r["landed"]), r["alerts"]))
             if not one: return None
             im = Image.open(io.BytesIO(one)); ext = r["landed"][0][0].rsplit(".", 1)[-1]
-            ok(f"{label}: a {kind or 'JPG/PNG/WebP'} of {len(one) / 1e6:.2f} MB (limit 6 MB), long edge {max(im.size)} ≤ 2400",
-               fmt(one) in ((kind,) if kind else ("jpeg", "png", "webp")) and len(one) <= 6 * 1024 * 1024 and max(im.size) <= 2400
+            ok(f"{label}: a {kind or 'JPG/PNG/WebP'} of {len(one) / 1e6:.2f} MB (target 5 MB), long edge {max(im.size)} ≤ 2400",
+               fmt(one) in ((kind,) if kind else ("jpeg", "png", "webp")) and len(one) <= 5 * 1024 * 1024 and max(im.size) <= 2400
                and {"jpg": "jpeg"}.get(ext, ext) == fmt(one), (fmt(one), len(one), im.size, ext))
             ok(f"{label}: upright, {size[0]}x{size[1]}" if size else f"{label}: upright",
                is_upright(im) and (not size or im.size == size) and im.getexif().get(274, 1) == 1, (im.size, im.getexif().get(274)))
@@ -191,11 +223,24 @@ try:
         raw_text = "This is a camera RAW file. Export it as a JPEG first."
 
         big = camera_jpeg()
-        assert 8e6 < len(big) < 11e6, len(big)   # the fixture really is a ~9 MB photo, over the endpoint's 6 MB
+        assert 8e6 < len(big) < 11e6, len(big)   # the fixture really is a ~9 MB photo, over the 5 MB target
         r = lands("camera JPEG, 9 MB, 6000x4000", pick("IMG_1201.JPG", "image/jpeg", big), (2400, 1600), "jpeg")
         if r:
             ok("camera JPEG: the button read “Preparing photo…” while it worked", "Preparing photo…" in r["labels"], r["labels"])
             ok("camera JPEG: no HEIC/TIFF decoder was fetched", not r["decoders"], r["decoders"])
+
+        dense = encode(photo(2400, 1800), "JPEG", quality=96, subsampling=0)
+        assert 5 * 1024 * 1024 < len(dense) < 6.5e6, len(dense)   # within the 2400 px edge, over the 5 MB target
+        lands("2400x1800 JPEG of 5.9 MB (small enough, too heavy): redone", pick("dense.jpg", "image/jpeg", dense), (2400, 1800), "jpeg")
+
+        speck = one_clear_pixel()
+        lands("4032x3024 PNG with one see-through pixel: a photo, so a JPEG", pick("screenshot.png", "image/png", speck), (2400, 1800), "jpeg")
+        lands("…and the same where toBlob hands back PNG for WebP (Safari)", pick("screenshot.png", "image/png", speck, SAFARI_TOBLOB), (2400, 1800))
+        r = lands("4032x3024 photo, 4% see-through margin, PNG instead of WebP (Safari): too big, so a JPEG on white",
+                  pick("cutout.webp", "image/webp", encode(photo(4032, 3024, alpha=True), "WEBP", quality=90), SAFARI_TOBLOB), (2400, 1800), "jpeg")
+        if r:
+            corner = Image.open(io.BytesIO(r["landed"][0][1])).convert("RGB").getpixel((2, 2))
+            ok("…its see-through margin came out white", min(corner) > 235, corner)
 
         sideways = Image.Exif(); sideways[274] = 6
         lands("phone JPEG stored sideways (EXIF orientation 6)",
@@ -226,6 +271,11 @@ try:
         r = lands("TIFF, Deflate-compressed, Orientation 6", pick("scan.tif", "image/tiff",
                   encode(turned(layout(900, 1200)), "TIFF", compression="tiff_adobe_deflate", tiffinfo={274: 6})), (900, 1200))
         if r: ok("TIFF: fetched the TIFF decoder (UTIF + pako), not the HEIC one", r["decoders"] and all(re.search("/(utif|pako)", u) for u in r["decoders"]), r["decoders"])
+
+        broken_text = "This browser couldn’t open that picture. Please save it as a JPEG or PNG and try again."
+        for label, comp in [("ZSTD", 50000), ("LZMA", 34925)]:
+            refused(f"TIFF the decoder can't really read ({label}: it comes out all black)", pick("scan.tif", "image/tiff", tiff(layout(800, 600), comp)), broken_text)
+        lands("CMYK TIFF (decodes with some alpha under 255: still a photo)", pick("print.tif", "image/tiff", encode(layout(800, 600).convert("CMYK"), "TIFF")), (800, 600), "jpeg")
 
         lands("ICO with see-through corners", pick("favicon.ico", "image/x-icon",
               encode(layout(256, 256, alpha=True), "ICO", sizes=[(256, 256), (48, 48), (16, 16)])), (256, 256), alpha=True)

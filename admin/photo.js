@@ -1,12 +1,13 @@
 /* Getting a photo ready for /api/upload, in the officer's browser.
 
-   /api/upload takes only a JPG, PNG or WebP under 6 MB (functions/api/upload.js, and that check stays the real
-   one). Phones and laptops hand us much more than that: iPhone HEIC, 8–12 MB camera JPEGs, AVIF, GIF, BMP, TIFF,
+   /api/upload takes only a JPG, PNG or WebP under 20 MB (functions/api/upload.js, and that check stays the real
+   one). This file aims lower, at 5 MB and 2400 px, so gallery pages stay light. Phones and laptops hand us much more than that: iPhone HEIC, 8–12 MB camera JPEGs, AVIF, GIF, BMP, TIFF,
    ICO, SVG logos. So a file is identified by its first bytes, never by its name or the type the browser guessed
    (HEIC often comes with no type at all, and some files have the wrong extension), and then:
    - a JPG, PNG or WebP already within limits goes up byte-for-byte;
-   - anything else is redrawn upright, at most 2400 px on its long side, as a JPEG, or as a WebP when it has
-     see-through parts (a logo);
+   - anything else is redrawn upright, at most 2400 px on its long side, as a JPEG, or as a WebP when at least 1%
+     of it is see-through (a logo). Whatever comes out over 5 MB, or not as a JPG/PNG/WebP, is redone as a JPEG
+     on white, at lower quality and then smaller, until it fits;
    - HEIC and TIFF, which Chrome and Firefox can't open, go through a decoder in vendor/ that is fetched only
      when such a file is picked. Safari opens both itself, so it never fetches them;
    - an SVG is always drawn to a picture first. The raw file can carry script, which would run on this site;
@@ -16,7 +17,7 @@
    libheif-js 1.23.5 libheif-wasm/libheif-bundle.js (LGPL-3.0), utif2 4.1.0 UTIF.js (MIT),
    pako 1.0.11 dist/pako_inflate.min.js (MIT), which UTIF needs for Deflate-compressed TIFFs. */
 
-const MAX_BYTES = 5 * 1024 * 1024;   // under the endpoint's 6 MB, with room to spare
+const MAX_BYTES = 5 * 1024 * 1024;   // the target; the endpoint's 20 MB is only a backstop
 const MAX_EDGE = 2400;
 const TYPE = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };   // what /api/upload accepts
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
@@ -79,7 +80,7 @@ async function prepare(file) {
   else {
     pic = await openNative(file);
     if (!pic && kind === 'heic') pic = await openHeic(bytes).catch(() => null);
-    if (!pic && kind === 'tiff') pic = await openTiff(bytes).catch((e) => { if (e.message === SAY.raw) throw e; return null; });
+    if (!pic && kind === 'tiff') pic = await openTiff(bytes).catch((e) => { if (e.message === SAY.raw || e.message === SAY.broken) throw e; return null; });
   }
   if (!pic) {
     if (TYPE[kind]) return asIs();   // can't measure it here: send it as it is and let /api/upload decide, as before
@@ -95,18 +96,40 @@ async function prepare(file) {
   ctx.drawImage(pic, 0, 0, canvas.width, canvas.height);
   if (pic.close) pic.close();
   const clear = kind !== 'jpeg' && seeThrough(ctx, canvas);
-  const blob = await new Promise((done) => canvas.toBlob(done, clear ? 'image/webp' : 'image/jpeg', 0.85));
-  if (!blob || !EXT[blob.type]) throw new Error(SAY.broken);
-  // Safari can't write WebP and hands back a PNG, so the name follows what actually came back.
+  let blob = await encode(canvas, clear ? 'image/webp' : 'image/jpeg', 0.85);
+  // Safari can't write WebP and hands back a PNG: that's kept when it fits, so the name follows what came back.
+  if (!blob || !EXT[blob.type] || blob.size > MAX_BYTES) blob = await jpegUnder(canvas);
+  if (!blob) throw new Error(SAY.broken);
   return { photo: new File([blob], name + EXT[blob.type], { type: blob.type }), note: kind === 'gif' && gifFrames(bytes) > 1 ? SAY.moving : '' };
 }
 
 const blank = (width, height) => Object.assign(document.createElement('canvas'), { width, height });
 
+const encode = (canvas, type, q) => new Promise((done) => canvas.toBlob(done, type, q));
+
+/* At least 1% of the pixels clearly see-through. A few stray soft pixels don't count, and neither does a CMYK TIFF,
+   which decodes with some alpha just under 255 (tools/e2e-photo-upload.py has both). */
 function seeThrough(ctx, canvas) {
   const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  for (let i = 3; i < px.length; i += 4) if (px[i] < 255) return true;
-  return false;
+  let n = 0;
+  for (let i = 3; i < px.length; i += 4) if (px[i] < 250) n++;
+  return n >= (px.length / 4) * 0.01;
+}
+
+/* A JPEG on white, under MAX_BYTES: lower quality first, then 80% smaller each round. null if even that won't do. */
+async function jpegUnder(src) {
+  for (let w = src.width, h = src.height; w >= 64 && h >= 64; w = Math.round(w * 0.8), h = Math.round(h * 0.8)) {
+    const flat = blank(w, h), ctx = flat.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, w, h);
+    for (const q of [0.85, 0.7, 0.55]) {
+      const blob = await encode(flat, 'image/jpeg', q);
+      if (blob && blob.type === 'image/jpeg' && blob.size <= MAX_BYTES) return blob;
+    }
+  }
+  return null;
 }
 
 /* The browser's own decoders. 'from-image' applies a JPEG's EXIF rotation; the <img> route is for browsers whose
@@ -171,6 +194,9 @@ async function openTiff(bytes) {
   const ifd = ifds.reduce((a, d) => (area(d) > area(a) ? d : a));   // the full picture, not a thumbnail page
   window.UTIF.decodeImage(bytes.buffer, ifd);
   const rgba = window.UTIF.toRGBA8(ifd), w = ifd.width, h = ifd.height;
+  // UTIF hands back zeros for what it can't really decode (ZSTD, LZMA, float samples). ponytail: a TIFF that is
+  // truly pure black is refused too; it's no photo anyone would post.
+  if (!rgba.some((v, i) => i % 4 !== 3 && v !== 0)) throw new Error(SAY.broken);
   const canvas = blank(w, h);
   canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, w * h * 4), w, h), 0, 0);
   return upright(canvas, ifd.t274 ? ifd.t274[0] : 1);

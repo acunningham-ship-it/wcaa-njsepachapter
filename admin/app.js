@@ -604,8 +604,9 @@ function labelled(spec, control) {
 }
 
 /* The file she picks is rarely what /api/upload takes (an iPhone's HEIC, a 10 MB camera JPEG, a TIFF, an SVG logo…),
-   so photo.js turns it into a JPG, PNG or WebP first. The extensions are listed so phones offer those files too. */
-const PHOTO_ACCEPT = 'image/*,.heic,.heif,.avif,.jfif,.tif,.tiff,.bmp,.gif,.svg,.ico';
+   so photo.js turns it into a JPG, PNG or WebP first. The extensions are listed so phones offer those files too.
+   Not .heic/.heif: on an iPhone they'd change what Photos hands over. HEIC still comes in through image/*. */
+const PHOTO_ACCEPT = 'image/*,.avif,.jfif,.tif,.tiff,.bmp,.gif,.svg,.ico';
 
 function uploadButton(input, obj, key) {
   const picker = el('input', { type: 'file', accept: PHOTO_ACCEPT, className: 'hidden-file' });

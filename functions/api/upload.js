@@ -10,7 +10,7 @@
    the filename is rebuilt from a slug plus random hex, never from user input. */
 import { json, requireSession, ghPutFile, bytesToBase64, missingEnv } from './_lib.js';
 
-const MAX_BYTES = 6 * 1024 * 1024;
+const MAX_BYTES = 20 * 1024 * 1024;   // a backstop: the site manager shrinks photos to 5 MB / 2400 px before sending
 const EXT_FOR = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 /* name the client may ask for -> the only folders this endpoint can ever write to */
@@ -60,7 +60,7 @@ export async function onRequest(context) {
   const ext = EXT_FOR[contentType];
   if (!ext) return json({ ok: false, error: 'Photos need to be a JPG, PNG, or WebP image.' }, 400);
   if (!bytes || bytes.length === 0) return json({ ok: false, error: 'That photo looks empty.' }, 400);
-  if (bytes.length > MAX_BYTES) return json({ ok: false, error: 'That photo is too large. Please use one under 6 MB.' }, 400);
+  if (bytes.length > MAX_BYTES) return json({ ok: false, error: 'That photo is too large. Please use one under 20 MB.' }, 400);
   if (!sniff(bytes, ext)) return json({ ok: false, error: 'That file doesn’t look like a real photo.' }, 400);
 
   const base = slugify(String(originalName).replace(/\.[^.]+$/, '')) || 'photo';

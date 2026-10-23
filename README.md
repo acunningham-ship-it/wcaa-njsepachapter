@@ -227,6 +227,7 @@ The `.jpg` originals under `uploads/` are no longer referenced by the site. They
 repo size, not page weight.
 
 Photos added in the site manager go through `admin/photo.js` first. `/api/upload` only takes JPEG, PNG or WebP up to
-6 MB, so the browser converts anything else (HEIC, AVIF, GIF, BMP, TIFF, ICO, SVG, or a JPEG over 5 MB or 2400px)
-to a JPEG (WebP if it has see-through parts), upright and at most 2400px. The file type is read from the bytes, not
+20 MB (a backstop), so the browser converts anything else (HEIC, AVIF, GIF, BMP, TIFF, ICO, SVG, or any photo over
+5 MB or 2400px) to a JPEG (WebP if at least 1% of it is see-through), upright, at most 2400px and under 5 MB, so
+gallery pages stay light. The file type is read from the bytes, not
 the name. Camera RAW files are refused with a message. Tested by `tools/e2e-photo-upload.py`.

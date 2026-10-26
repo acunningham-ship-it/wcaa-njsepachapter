@@ -142,6 +142,11 @@
               "aspect": "1 / 1",
               "items": [
                 {
+                  "src": "uploads/site/red-save-the-date-christmas-invitation-ac15e317.jpg",
+                  "alt": "Test",
+                  "caption": "Holiday Brunch"
+                },
+                {
                   "src": "uploads/wcaa-instagram-photos/33_DO1oSklDkk7_1.webp",
                   "alt": "Trim workshop at Stout Textiles"
                 },
@@ -152,11 +157,6 @@
                 {
                   "src": "uploads/wcaa-instagram-photos/29_DRTZodOjsS__0.webp",
                   "alt": "Holiday cookie-decorating social"
-                },
-                {
-                  "src": "uploads/site/red-save-the-date-christmas-invitation-ac15e317.jpg",
-                  "alt": "Test",
-                  "caption": "test"
                 }
               ]
             },

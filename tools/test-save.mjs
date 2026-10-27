@@ -258,7 +258,8 @@ const callSave = async (payload, { cookie = COOKIE, env = { ...ENV, DB: makeDB()
   resetGH(read('content/pages.json'));
   const doc = clone(REAL_CONTENT);
   const ev = (function find(bs) { for (const b of bs || []) { if (b.type === 'events') return b;
-    const r = find(b.blocks) || find(b.left) || find(b.right); if (r) return r; } return null; })(doc.pages[0].sections[2].blocks);
+    const r = find(b.blocks) || find(b.left) || find(b.right); if (r) return r; } return null; })(
+    doc.pages.flatMap((p) => p.sections || []).flatMap((s) => s.blocks || []));
   ev.items = [{ month: 'Jan', day: '1', title: 'New event' }];
   const r = await callSave({ content: doc, site: REAL_SITE });
   ok('server refuses the sample event ("New event")', r.status === 400 && /sample text/.test(r.json?.error || ''), r.json);
@@ -357,6 +358,9 @@ const callSave = async (payload, { cookie = COOKIE, env = { ...ENV, DB: makeDB()
   const savedDoc = JSON.parse(committedFiles()['content/pages.json']);
   ok('  ...and the committed item keeps its registration switch and id, just not the link',
      evItems(savedDoc)[0].register === true && evItems(savedDoc)[0].id === 'jun-18-centurion' && !('meetingLink' in evItems(savedDoc)[0]), evItems(savedDoc)[0]);
+  ok('  ...marked online (so its card may say “View the meeting link”), the flag saying only that a link exists',
+     evItems(savedDoc)[0].online === true && committedFiles()['events.html'].includes('data-registrants="jun-18-centurion" data-event-title="' ) &&
+     /data-registrants="jun-18-centurion"[^>]*data-online="1"/.test(committedFiles()['events.html']));
   ok('the PUBLIC link stays in the content and is on the events page', evItems(savedDoc)[1].meetingLink === PUBLIC &&
      committedFiles()['events.html'].includes('href="' + PUBLIC + '" target="_blank" rel="noreferrer">Join the meeting</a>'));
   ok('  ...and is in D1 too (registrants see it on their confirmation)', DB.raw.prepare("SELECT url FROM event_links WHERE event_id = 'apr-16-lafayette'").get()?.url === PUBLIC);

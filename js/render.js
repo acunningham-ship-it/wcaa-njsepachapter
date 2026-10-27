@@ -81,6 +81,17 @@ export function safeSrc(src) {
   return '';
 }
 
+/* An uploaded video file: only from uploads/videos/ (the one folder /api/upload writes videos to),
+   only the three formats it accepts. Same reject-don't-strip rule as safeSrc. */
+export function safeVideoSrc(src) {
+  if (typeof src !== 'string') return '';
+  const cleaned = src.trim();
+  if (/[\u0000-\u001F\u007F]/.test(cleaned)) return '';
+  if (cleaned.indexOf('..') !== -1) return '';
+  if (/^uploads\/videos\/[A-Za-z0-9._-]+\.(mp4|webm|mov)$/i.test(cleaned)) return cleaned;
+  return '';
+}
+
 /* An event's meeting link: https on Zoom, Google Meet or Microsoft Teams, nothing else.
    It becomes a "Join the meeting" button that a registrant clicks without a second look,
    so an allowlist of the three services the chapter actually uses, not "any https URL".

@@ -28,6 +28,19 @@
       },
       "sections": [
         {
+          "tight": true,
+          "blocks": [
+            {
+              "type": "announcement",
+              "tone": "notice",
+              "title": "Holiday Brunch — Sunday, November 1",
+              "text": "11:00 am – 2:00 pm at Barrel and Roost, 160 Route 35 South, Red Bank, NJ.\nBring a $20 wrapped gift for the holiday gift exchange.",
+              "linkLabel": "Register on the Events page",
+              "href": "events.html"
+            }
+          ]
+        },
+        {
           "blocks": [
             {
               "type": "heading",
@@ -40,90 +53,6 @@
               "size": "md",
               "prose": true,
               "text": "We are proud members of the Window Coverings Association of America — the only national non-profit trade association dedicated to the retail window coverings industry and to the dealers, designers, decorators, workrooms, fabricators, and installers who are our members."
-            }
-          ]
-        },
-        {
-          "tint": true,
-          "tight": true,
-          "blocks": [
-            {
-              "type": "cards",
-              "columns": 3,
-              "marker": "icon",
-              "items": [
-                {
-                  "icon": "assets/icons/calendar-days.svg",
-                  "title": "Monthly Programs",
-                  "text": "Speakers, software demos, and workroom education at our monthly chapter meetings."
-                },
-                {
-                  "icon": "assets/icons/users.svg",
-                  "title": "A Professional Network",
-                  "text": "Dealers, designers, workrooms, fabricators, and installers — all in one room."
-                },
-                {
-                  "icon": "assets/icons/map-pin.svg",
-                  "title": "Local to Our Region",
-                  "text": "Serving Southeastern Pennsylvania and New Jersey, with events close to home."
-                },
-                {
-                  "title": "",
-                  "text": ""
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "blocks": [
-            {
-              "type": "split",
-              "columns": "0.9fr 1.4fr",
-              "gap": "var(--space-12)",
-              "align": "start",
-              "left": [
-                {
-                  "type": "heading",
-                  "align": "left",
-                  "kicker": "What's Next",
-                  "title": "Upcoming Events",
-                  "lede": "Chapter meetings are announced by email, on Facebook, and on Instagram — the next one will appear here as soon as it's scheduled.",
-                  "marginBottom": "var(--space-6)"
-                },
-                {
-                  "type": "buttons",
-                  "layout": "plain",
-                  "items": [
-                    {
-                      "label": "All Chapter Events",
-                      "href": "events.html",
-                      "variant": "outline",
-                      "size": "sm"
-                    }
-                  ]
-                }
-              ],
-              "right": [
-                {
-                  "type": "events",
-                  "gap": "var(--space-4)",
-                  "items": [
-                    {
-                      "month": "November 1, 2026",
-                      "day": "Sunday",
-                      "title": "Holiday Brunch",
-                      "badge": "In Person",
-                      "time": "11am - 2pm",
-                      "location": "Barrell and Roost  160 Route 35 South in Redbank, NJ. 07701",
-                      "meetingPublic": true,
-                      "register": true,
-                      "id": "november-1-2026-sunday-holiday-brunch",
-                      "description": "Please join us for our NJ/SEPA chapter Holiday Brunch. \nBring a $20.00 gift for exchange"
-                    }
-                  ]
-                }
-              ]
             }
           ]
         },

@@ -19,7 +19,7 @@
  * the default. That is the difference between a CMS that writes CSS from a menu
  * and one that writes CSS from user input.
  */
-import { esc, attr, safeHref, safeSrc, safeMeetingUrl, videoEmbed } from './render.js';
+import { esc, attr, safeHref, safeSrc, safeVideoSrc, safeMeetingUrl, videoEmbed } from './render.js';
 
 /* ---------- style-value allowlists ---------- */
 
@@ -66,6 +66,22 @@ const I = (ed, i) => (ed ? ' data-item="' + attr(ed.base + '.items.' + i) + '"' 
 /* An event's registration id: what its Register button links to and what D1 keys sign-ups by.
    Minted once by the admin and never recomputed, so retitling an event keeps its sign-ups. */
 export const EVENT_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/* Is this event (also) held online, i.e. is there a meeting link for people to get? Only then
+   does the site talk about a meeting link at all; an in-person brunch never says "View the
+   meeting link" (officer notes 2026-10-27). True when:
+     - save.js marked it `online` because the officer entered a meeting link (the private link
+       itself never reaches the content; the flag says only that one exists), or
+     - a public link is on it, or
+     - its tag or place says so (Zoom, webinar, online, virtual, Teams, Google Meet) — so a Zoom
+       meeting whose link isn't posted yet still reads as one. */
+const ONLINE_WORDS = /\b(?:zoom|webinar|online|virtual|teams|google meet|livestream|live stream)\b/i;
+export function isOnline(e) {
+  if (!e || typeof e !== 'object') return false;
+  if (e.online === true) return true;
+  if (safeMeetingUrl(e.meetingLink)) return true;
+  return ONLINE_WORDS.test([e.badge, e.location].filter((x) => typeof x === 'string').join(' '));
+}
 
 /* ---------- shared fragments ---------- */
 
@@ -190,6 +206,31 @@ const BLOCKS = {
     );
   },
 
+  /* The announcement banner: the first thing on the home page, for whatever is urgent or current
+     (a cancelled meeting, a registration deadline, the next event). Officer notes 2026-10-27:
+     "need a spot right off the bat for urgent messages and current announcements". With nothing
+     typed in it renders nothing, so the home page simply starts with the welcome; the editor shows
+     a "No announcement right now — click here" stand-in in its place. The text keeps the officer's
+     line breaks through CSS (white-space:pre-line), never through markup. */
+  announcement(b, site, ed) {
+    const title = typeof b.title === 'string' ? b.title.trim() : '';
+    const text = typeof b.text === 'string' ? b.text.trim() : '';
+    if (!title && !text) return '';
+    const urgent = b.tone === 'urgent';
+    const kicker = typeof b.kicker === 'string' && b.kicker.trim() ? b.kicker : (urgent ? 'Urgent' : 'Announcement');
+    const button = b.linkLabel && safeHref(b.href)
+      ? buttonTag({ label: b.linkLabel, href: b.href, variant: urgent ? 'primary' : 'gold', size: 'md' })
+      : '';
+    return (
+      '<div class="wcaa-ann' + (urgent ? ' wcaa-ann--urgent' : '') + '" role="' + (urgent ? 'alert' : 'status') + '">' +
+      '<div class="wcaa-ann__kicker"' + (b.kicker ? F(ed, 'kicker') : '') + '>' + esc(kicker) + '</div>' +
+      (title ? '<h2 class="wcaa-ann__title"' + F(ed, 'title') + '>' + esc(b.title) + '</h2>' : '') +
+      (text ? '<p class="wcaa-ann__text"' + F(ed, 'text') + '>' + esc(b.text) + '</p>' : '') +
+      (button ? '<div class="wcaa-ann__actions">' + button + '</div>' : '') +
+      '</div>'
+    );
+  },
+
   text(b, site, ed) {
     const body = b.spans ? spans(b.spans) : esc(b.text);
     if (!body) return '';
@@ -302,20 +343,24 @@ const BLOCKS = {
         const reg = e.register && typeof e.id === 'string' && EVENT_ID.test(e.id)
           ? '<a class="wcaa-btn wcaa-btn--primary wcaa-btn--lg wcaa-ev__reg" href="register.html?event=' + attr(e.id) + '">Register for this event</a>'
           : '';
-        /* "List of registrants": a sibling of Register, on exactly the events that take
+        /* "View who's going": a sibling of Register, on exactly the events that take
            registration (so e.id is a valid EVENT_ID here). It opens the dialog js/registrants.js
-           builds — who is registered, plus the meeting link — behind the visibility gate the
-           server enforces (functions/api/registrants.js). It carries ONLY the event id, the title,
-           and the PUBLIC Turnstile site key: no names and no meeting link ever enter this markup,
-           which is committed to a public repo. The site key is a public client identifier (it is
-           already in the page HTML on every form), and the gated email check needs it to run the
-           same bot challenge the sign-up form does; js/registrants.js renders the widget in the
-           dialog and loads the Turnstile script on demand. */
+           builds — who is registered, plus the meeting link for an ONLINE event — behind the
+           visibility gate the server enforces (functions/api/registrants.js). data-online tells
+           that script whether a meeting link is part of this event at all: without it the button
+           never turns into "View the meeting link" and the dialog never mentions one. It carries
+           ONLY the event id, the title, that flag, and the PUBLIC Turnstile site key: no names
+           and no meeting link ever enter this markup, which is committed to a public repo. The
+           site key is a public client identifier (it is already in the page HTML on every form),
+           and the gated email check needs it to run the same bot challenge the sign-up form does;
+           js/registrants.js renders the widget in the dialog and loads the Turnstile script on
+           demand. */
         const tkey = turnstileKey(site);
         const registrants = reg
           ? '<button type="button" class="wcaa-btn wcaa-btn--outline wcaa-btn--lg wcaa-ev__registrants"' +
             ' data-registrants="' + attr(e.id) + '" data-event-title="' + attr(e.title) + '"' +
-            (tkey ? ' data-turnstile-key="' + attr(tkey) + '"' : '') + '>List of registrants</button>'
+            (isOnline(e) ? ' data-online="1"' : '') +
+            (tkey ? ' data-turnstile-key="' + attr(tkey) + '"' : '') + '>View who’s going</button>'
           : '';
         const meeting = e.meetingPublic ? safeMeetingUrl(e.meetingLink) : '';
         const join = meeting
@@ -355,17 +400,28 @@ const BLOCKS = {
       .map((it, i) => {
         const src = safeSrc(it && it.src);
         const alt = esc(it && it.alt);
-        const inner = src
-          ? '<img src="' + attr(src) + '" alt="' + alt + '" loading="lazy">'
-          : '<span class="wcaa-gal__empty">' + (alt || 'Photo') + '</span>';
-        /* A pasted video link. NO iframe in the markup: js/video.js builds it when Play is pressed
-           (so nothing from the video site loads for a visitor who doesn't), and the plain link
-           works with JavaScript off. The embed address comes from videoEmbed, never from the paste. */
+        /* A pasted video LINK (YouTube, Facebook, Instagram — an Instagram photo post works too). */
         const v = it && videoEmbed(it.video);
+        /* An UPLOADED video file plays right in the box, with the photo (if any) as its cover.
+           A plain <video> element: no script, nothing from another site. */
+        const vfile = safeVideoSrc(it && it.videoFile);
+        const inner = vfile
+          ? '<video class="wcaa-gal__video" src="' + attr(vfile) + '"' + (src ? ' poster="' + attr(src) + '"' : '') +
+            ' controls preload="metadata" playsinline' + (alt ? ' aria-label="' + alt + '"' : '') + '></video>'
+          : src
+            ? '<img src="' + attr(src) + '" alt="' + alt + '" loading="lazy">'
+            : '<span class="wcaa-gal__empty">' + (alt || (v ? v.site + ' post' : 'Photo')) + '</span>';
+        /* NO iframe in the markup: js/video.js builds it when Play is pressed (so nothing from the
+           video site loads for a visitor who doesn't), and the plain link works with JavaScript
+           off. The embed address comes from videoEmbed, never from the paste. An Instagram link
+           may be a photo post rather than a video, so it says "View the post", not "Play video". */
+        const ig = v && v.site === 'Instagram';
         const video = v
           ? '<div class="wcaa-vid"><button type="button" class="wcaa-vid__play" data-embed="' + attr(v.embed) +
-            '" data-ratio="' + attr(v.ratio) + '" data-title="' + attr(it.alt || it.caption || 'Video') + '">▶ Play video</button>' +
-            '<a class="wcaa-vid__link" href="' + attr(v.watch) + '" target="_blank" rel="noopener noreferrer">Watch on ' + v.site + '</a></div>'
+            '" data-ratio="' + attr(v.ratio) + '" data-title="' + attr(it.alt || it.caption || (ig ? 'Instagram post' : 'Video')) + '">' +
+            (ig ? '▶ View the post' : '▶ Play video') + '</button>' +
+            '<a class="wcaa-vid__link" href="' + attr(v.watch) + '" target="_blank" rel="noopener noreferrer">' +
+            (ig ? 'Open on Instagram' : 'Watch on ' + v.site) + '</a></div>'
           : '';
         return (
           '<figure class="wcaa-gal__item" style="margin:0"' + I(ed, i) + '>' +
@@ -609,6 +665,7 @@ export function renderBlocks(list, site, ed) {
 const EMPTY_TEXT = {
   events: 'No events listed yet', cards: 'No cards yet', gallery: 'No photos yet',
   officers: 'No officers listed yet', list: 'No points yet', buttons: 'No buttons yet', image: 'No photo chosen yet',
+  announcement: 'No announcement right now (nothing shows on the website)',
 };
 
 const ADD_NOUN = { events: 'an event', cards: 'a card', gallery: 'a photo', officers: 'an officer',
@@ -867,6 +924,7 @@ export function renderRegisterPage(content, site) {
       title: String(e.title),
       when: [[e.month, e.day].filter(Boolean).join(' '), e.time].filter(Boolean).map(String).join(' · '),
       where: e.location ? String(e.location) : '',
+      online: isOnline(e),
     };
   }
   const pages = content && Array.isArray(content.pages) ? content.pages : [];
@@ -908,7 +966,7 @@ export function renderRegisterPage(content, site) {
     '<p class="wcaa-reg__lead" id="reg-join-note" hidden>Save this link, you’ll use it to join on the day: ' +
     '<span class="wcaa-reg__url" id="reg-join-url"></span><br>' +
     'Lost it? Come back to the events page: this browser remembers you’re registered and shows it there. ' +
-    'On another phone or computer, press “List of registrants” and enter this email.</p>' +
+    'On another phone or computer, press “View who’s going” and enter this email.</p>' +
     '<a class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" href="' + back + '">Back to the events</a></div>' +
     /* Registered from this browser already (js/forms.js reads what it remembered): no form, the
        link one tap away through the same email + bot check (js/registrants.js), or a new form for
@@ -917,7 +975,7 @@ export function renderRegisterPage(content, site) {
     '<h2 class="wcaa-reg__title">You’re already registered for <span id="reg-already-title"></span></h2>' +
     '<p class="wcaa-reg__lead">This browser remembers you registered as <strong id="reg-already-email"></strong>.</p>' +
     '<button type="button" class="wcaa-btn wcaa-btn--primary wcaa-btn--lg" id="reg-already-show" data-registrants=""' +
-    (turnstileKey(site) ? ' data-turnstile-key="' + attr(turnstileKey(site)) + '"' : '') + '>Show my meeting link</button>' +
+    (turnstileKey(site) ? ' data-turnstile-key="' + attr(turnstileKey(site)) + '"' : '') + '>See who’s going</button>' +
     '<button type="button" class="wcaa-btn wcaa-btn--outline wcaa-btn--lg" id="reg-someone">Register someone else</button></div>' +
     '<script type="application/json" id="reg-events">' + JSON.stringify(events).replace(/</g, '\\u003c') + '</script>' +
     '</div></div></section>';

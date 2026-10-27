@@ -1,6 +1,11 @@
-/* "List of registrants" — the button that sits next to "Register for this event" on an event
- * card. It opens a small dialog that shows who is registered (first name + last initial) and the
- * event's meeting (Zoom) link, from /api/registrants.
+/* "View who's going" — the button that sits next to "Register for this event" on an event
+ * card. It opens a small dialog that shows who is registered (first name + last initial) and, for
+ * an ONLINE event, the meeting (Zoom) link, from /api/registrants.
+ *
+ * IN PERSON vs ONLINE (officer notes 2026-10-27: "if it is an in person event it should never say
+ * view the meeting link"). The card's button carries data-online="1" only when the event has a
+ * meeting link to give out (js/blocks.js isOnline). Without it the button always reads "View who's
+ * going", the dialog never mentions a link, and the email prompt asks only to see who's going.
  *
  * Same shape as js/going.js and js/forms.js: a plain deferred script, no imports, no framework.
  * It loads ONLY on a page that actually has an event you can register for (js/blocks.js gates the
@@ -19,8 +24,8 @@
  *
  * COMING BACK (judge #11487, Armani: "once they register, if they go back to events it doesn't show
  * the link, it has them re-register"). A browser that registered (js/forms.js) or opened the list
- * with an email here remembers that email for the event. Its card then says "You're registered" and
- * the button reads "View the meeting link", and the dialog sends the remembered email by itself once
+ * with an email here remembers that email for the event. Its card then says "You're registered" and,
+ * for an online event, the button reads "View the meeting link"; the dialog sends the remembered email by itself once
  * the bot check passes: one tap, nothing re-typed, no second registration. The server check is
  * unchanged (Turnstile + "is this email registered", every time); remembering only saves typing. A
  * remembered email the server says isn't registered (an officer removed it) is forgotten.
@@ -117,8 +122,9 @@
     var reg = actions.querySelector('.wcaa-ev__reg');
     var mine = actions.nextElementSibling && actions.nextElementSibling.classList.contains('wcaa-ev__mine') ? actions.nextElementSibling : null;
     if (!btn.hasAttribute('data-label')) btn.setAttribute('data-label', btn.textContent);
+    var online = btn.getAttribute('data-online') === '1';
     if (reg) reg.hidden = !!email;
-    btn.textContent = email ? 'View the meeting link' : btn.getAttribute('data-label');
+    btn.textContent = email && online ? 'View the meeting link' : btn.getAttribute('data-label');
     btn.classList.toggle('wcaa-btn--primary', !!email);   // it's the card's main action now that Register stepped aside
     btn.classList.toggle('wcaa-btn--outline', !email);
     if (!email) { if (mine) mine.parentNode.removeChild(mine); return; }
@@ -155,7 +161,7 @@
 
   function openDialog(trigger, eventTitle) {
     lastFocus = trigger || null;
-    title.textContent = eventTitle ? ('Registered: ' + eventTitle) : 'Registrants';
+    title.textContent = eventTitle ? ('Who’s going: ' + eventTitle) : 'Who’s going';
     overlay.hidden = false;
     document.addEventListener('keydown', onKeydown);
     box.focus();
@@ -183,14 +189,15 @@
 
   /* Shows the roster + meeting link. `data` is { names: [...], meeting: <https url | null> }.
      Names are rendered with textContent; the link's href is assigned, not interpolated, and only
-     if it is an https URL — the same client-side guard js/forms.js uses on the confirmation link. */
-  function renderList(data) {
+     if it is an https URL — the same client-side guard js/forms.js uses on the confirmation link.
+     `online` false (an in-person event): no "the link hasn't been posted" line, just the list. */
+  function renderList(data, online) {
     clear(bodyEl);
     var names = (data && Array.isArray(data.names)) ? data.names.filter(function (n) { return typeof n === 'string' && n; }) : [];
 
     // Meeting link first — it is the thing most people open the dialog for.
     var meeting = data && data.meeting;
-    if (typeof meeting === 'string' && /^https:\/\//i.test(meeting)) {
+    if (online && typeof meeting === 'string' && /^https:\/\//i.test(meeting)) {
       var linkWrap = document.createElement('p');
       linkWrap.className = 'wcaa-rl__link';
       var a = document.createElement('a');
@@ -206,7 +213,7 @@
       url.className = 'wcaa-rl__url';
       url.textContent = meeting;              // so it can be copied; textContent, not a link body
       bodyEl.appendChild(url);
-    } else {
+    } else if (online) {
       var none = document.createElement('p');
       none.className = 'wcaa-rl__msg';
       none.textContent = 'The meeting link hasn’t been posted yet.';
@@ -236,7 +243,10 @@
      bot-check the sign-up form uses, POST both, render on success or show the server's message on
      failure. The email is used only to send; it is never shown back, and the server returns no
      other registrant's address. */
-  function renderGate(eventId, tkey, email) {
+  function renderGate(eventId, tkey, email, online) {
+    var ask = online
+      ? 'Enter the email you registered with to see who’s going and the meeting link.'
+      : 'Enter the email you registered with to see who’s going.';
     clear(bodyEl);
     removeWidget();
     var auto = !!email;   // a remembered email goes by itself, once the bot check has passed
@@ -245,7 +255,7 @@
     intro.className = 'wcaa-rl__msg';
     intro.textContent = auto
       ? 'Checking your registration…'
-      : 'Enter the email you registered with to see who’s registered and the meeting link.';
+      : ask;
     bodyEl.appendChild(intro);
 
     var field = document.createElement('div');
@@ -295,7 +305,7 @@
     }
 
     function fail(msg) {
-      intro.textContent = 'Enter the email you registered with to see who’s registered and the meeting link.';
+      intro.textContent = ask;
       err.textContent = msg; err.hidden = false;
       submit.disabled = false; submit.textContent = 'Show the list';
     }
@@ -320,7 +330,7 @@
           remember(eventId, email);   // proven registered: next time it's one tap
           refresh(eventId);
           removeWidget();        // the widget DOM is about to be cleared with the rest of the form
-          renderList(r.body);
+          renderList(r.body, online);
         })
         .catch(function (e2) {
           // Turnstile tokens are single-use; get a fresh one for the next attempt.
@@ -358,6 +368,7 @@
     var eventId = trigger.getAttribute('data-registrants');
     var eventTitle = trigger.getAttribute('data-event-title') || '';
     var tkey = trigger.getAttribute('data-turnstile-key') || '';
+    var online = trigger.getAttribute('data-online') === '1';
     if (!eventId) return;
     openDialog(trigger, eventTitle);
     message('Loading…');
@@ -366,8 +377,8 @@
         if (!r.ok || !r.body || r.body.ok !== true) {
           throw new Error((r.body && r.body.error) || 'We couldn’t load the list. Please try again.');
         }
-        if (r.body.mode === 'public') { renderList(r.body); return; }
-        renderGate(eventId, tkey, remembered(eventId));   // "gated" (the default): the email + bot-check first
+        if (r.body.mode === 'public') { renderList(r.body, online); return; }
+        renderGate(eventId, tkey, remembered(eventId), online);   // "gated" (the default): the email + bot-check first
       })
       .catch(function (e) {
         message(e.message || 'We couldn’t load the list. Please try again.', 'bad');

@@ -62,5 +62,39 @@ async function send(bytes) {
   ok('20 MB and one byte is refused', r2.status === 400, r2);
 }
 
+/* ---------- short video files (dest "video") ---------- */
+function mp4(bytes) {   // an ISO-media header ('ftyp' at byte 4) and filler
+  const b = new Uint8Array(bytes);
+  b.set([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+  return b;
+}
+async function sendVideo(bytes, name, type) {
+  const form = new FormData();
+  form.append('file', new File([bytes], name, { type }));
+  form.append('dest', 'video');
+  const request = new Request('http://localhost/api/upload', { method: 'POST', headers: { cookie: COOKIE }, body: form });
+  const res = await upload({ request, env: ENV });
+  return { status: res.status, json: await res.json() };
+}
+{
+  let r = await sendVideo(mp4(2 * MB), 'Bound at the seams.mp4', 'video/mp4');
+  ok('a short MP4 is accepted into uploads/videos/', r.status === 200 && /^uploads\/videos\/bound-at-the-seams-[0-9a-f]{8}\.mp4$/.test(r.json.src || ''), r);
+  r = await sendVideo(mp4(2 * MB), 'clip.mov', 'video/quicktime');
+  ok('an iPhone MOV is accepted', r.status === 200 && /\.mov$/.test(r.json.src || ''), r);
+  const n = puts.length;
+  r = await sendVideo(mp4(21 * MB), 'long.mp4', 'video/mp4');
+  ok('a video over 20 MB is refused, pointing to YouTube/Facebook/Instagram', r.status === 400 && /paste the link/.test(r.json.error || ''), r.json);
+  r = await sendVideo(jpeg(MB), 'fake.mp4', 'video/mp4');
+  ok('a file that isn’t really a video is refused', r.status === 400, r.json);
+  r = await sendVideo(jpeg(MB), 'photo.jpg', 'image/jpeg');
+  ok('a photo can’t go into the video folder', r.status === 400, r.json);
+  ok('  ...and none of the refused files was committed', puts.length === n, puts.length - n);
+  const form = new FormData();
+  form.append('file', new File([mp4(MB)], 'x.mp4', { type: 'video/mp4' }));
+  form.append('dest', 'gallery');
+  const res = await upload({ request: new Request('http://localhost/api/upload', { method: 'POST', headers: { cookie: COOKIE }, body: form }), env: ENV });
+  ok('a video can’t go into a photo folder', res.status === 400);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

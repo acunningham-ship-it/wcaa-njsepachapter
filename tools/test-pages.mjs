@@ -215,8 +215,7 @@ const content = JSON.parse(read('content/pages.json'));
                                    p[file] && p[file].includes(needle));
 
   has('index.html', 'A Community of Window Covering Professionals');
-  has('index.html', 'Monthly Programs');
-  has('index.html', 'will appear here as soon as');   // the Upcoming Events section lede (home)
+  has('index.html', 'class="wcaa-ann');              // the announcement banner (home, first section)
   has('index.html', 'uploads/wcaa-instagram-photos/23_DTnYvGvDn8k_0.webp');
   has('index.html', 'Take your business to new heights');
   has('about.html', 'Mission Statement');
@@ -369,9 +368,19 @@ const content = JSON.parse(read('content/pages.json'));
   /* "List of registrants": a sibling button on exactly the events that take registration. It
      carries only the event id + title — never the meeting link, public or private (that is read
      from D1 at view time by /api/registrants, behind the gate). */
-  ok('an event taking registration also gets a "List of registrants" button carrying its id',
+  ok('an event taking registration also gets a "View who’s going" button carrying its id',
      card({ register: true, id: 'oct-14-fall-tour' }).includes('data-registrants="oct-14-fall-tour"') &&
-     card({ register: true, id: 'oct-14-fall-tour' }).includes('>List of registrants</button>'));
+     card({ register: true, id: 'oct-14-fall-tour' }).includes('>View who’s going</button>'));
+  /* In person vs online (officer notes 2026-10-27): only an online event's button is marked, so only
+     it can ever turn into "View the meeting link" (js/registrants.js). */
+  const btnOf = (e) => (card(e).match(/<button[^>]*data-registrants[^>]*>/) || [''])[0];
+  ok('an IN-PERSON event’s button is not marked online',
+     !btnOf({ register: true, id: 'a', badge: 'In Person', location: 'Barrel and Roost' }).includes('data-online'));
+  ok('a Zoom / webinar event’s button IS marked online (by its tag or place)',
+     btnOf({ register: true, id: 'b', badge: 'Zoom' }).includes('data-online="1"') &&
+     btnOf({ register: true, id: 'c', location: 'Live webinar' }).includes('data-online="1"'));
+  ok('an event save.js flagged as having a private link is marked online, and the link is still absent',
+     btnOf({ register: true, id: 'd', online: true }).includes('data-online="1"') && !/zoom\.us/.test(btnOf({ register: true, id: 'd', online: true })));
   ok('...it is NOT present when registration is off', !card({ register: false, id: 'oct-14-fall-tour' }).includes('data-registrants='));
   ok('...nor with an id that isn’t a valid registration id', !card({ register: true, id: 'Bad Id' }).includes('data-registrants='));
   const registrantsBtn = (e) => (card(e).match(/<button[^>]*data-registrants[\s\S]*?<\/button>/) || [''])[0];
@@ -552,10 +561,18 @@ const content = JSON.parse(read('content/pages.json'));
   ok('...including blocks nested in groups and split columns', nested > 0, { nested });
   ok('every click path resolves to the block it claims to be', wrong.length === 0, wrong.slice(0, 3));
   const home = renderPage(content.pages.find((p) => p.slug === 'index'), site, { edit: true });
+  /* The live home page no longer has an events list (officer notes 2026-10-27: events live on the
+     Events page only), so the stand-in is checked on a page built for it. */
+  const emptyEv = renderPage({ slug: 't', title: 'T', sections: [{ blocks: [{ type: 'split', left: [{ type: 'heading', title: 'H' }],
+    right: [{ type: 'events', items: [] }] }] }] }, site, { edit: true });
   ok('an EMPTY events block gets a visible, clickable stand-in in the editor',
-     /data-edit-type="events"[^>]*class="wcaa-edit-empty"[^>]*>No events listed yet/.test(home));
+     /data-edit-type="events"[^>]*class="wcaa-edit-empty"[^>]*>No events listed yet/.test(emptyEv));
   ok('...and clicking it adds an event (data-add points at its items)',
-     /data-edit-type="events" data-add="sections\.\d+\.blocks\.\d+\.right\.\d+\.items"/.test(home));
+     /data-edit-type="events" data-add="sections\.\d+\.blocks\.\d+\.right\.\d+\.items"/.test(emptyEv));
+  const emptyAnn = renderPage({ slug: 't', title: 'T', sections: [{ blocks: [{ type: 'announcement', title: '', text: '' }] }] }, site, { edit: true });
+  ok('an EMPTY announcement shows nothing on the site but a clickable stand-in in the editor',
+     /data-edit-type="announcement"[^>]*class="wcaa-edit-empty"/.test(emptyAnn) &&
+     !renderPage({ slug: 't', title: 'T', sections: [{ blocks: [{ type: 'announcement', title: '', text: '' }] }] }, site).includes('wcaa-ann'));
 
   /* In-place editing: every data-f / data-item / data-add path must resolve on the page object
      with the SAME dotted walk admin/app.js getAt() does, and a data-f must land on TEXT whose

@@ -20,7 +20,7 @@
  * guess every context the value later lands in.
  */
 import { BLOCK_TYPES, EVENT_ID, eventItems } from './blocks.js';
-import { safeMeetingUrl, safeSrc, videoEmbed } from './render.js';
+import { safeMeetingUrl, safeSrc, safeHref, safeVideoSrc, videoEmbed } from './render.js';
 
 /* A slug becomes a filename. Leading digit allowed so "404" can exist; no dots
    and no slashes, so it cannot traverse or pick its own extension. */
@@ -39,6 +39,7 @@ const TEXT_KEYS = [
   'title', 'text', 'label', 'caption', 'alt', 'kicker', 'lede', 'name', 'role', 'note',
   'heading', 'month', 'day', 'badge', 'time', 'location', 'description', 'submitLabel',
   'n', 'phone', 'email', 'src', 'href', 'icon', 'iconAfter', 'id', 'type', 'slug', 'meetingLink', 'image', 'video',
+  'videoFile', 'tone', 'linkLabel',
 ];
 
 function checkTextKeys(value, path) {
@@ -110,6 +111,7 @@ const SAMPLES = {
   cards: ['title', 'Card'],
   events: ['title', 'New event'],
   officers: ['name', 'Name'],
+  announcement: ['title', 'New announcement'],
 };
 
 /* Registration and meeting links on one event. The messages are for an officer: they say what
@@ -120,7 +122,7 @@ function checkEvent(e, p) {
   if (hasId && (typeof e.id !== 'string' || !EVENT_ID.test(e.id))) {
     return err(p + '.id', 'has a registration id that isn’t valid (lowercase letters, numbers and hyphens).');
   }
-  for (const key of ['register', 'meetingPublic']) {
+  for (const key of ['register', 'meetingPublic', 'online']) {
     if (e[key] !== undefined && typeof e[key] !== 'boolean') return err(`${p}.${key}`, 'must be ticked or unticked.');
   }
   /* The event's picture must be a file this site holds (the same rule the renderer applies),
@@ -173,9 +175,25 @@ function checkBlocks(blocks, path, depth) {
       for (let k = 0; k < b.items.length; k++) {
         const v = b.items[k] && b.items[k].video;
         if (v !== undefined && v !== '' && !videoEmbed(v)) {
-          return err(`${p}.items[${k}].video`, 'isn’t a YouTube, Facebook or Instagram video link. Paste the link from the video’s page, or clear the box.');
+          return err(`${p}.items[${k}].video`, 'isn’t a YouTube, Facebook or Instagram link we can show. Paste the link from the video’s or post’s page, or clear the box.');
+        }
+        const f = b.items[k] && b.items[k].videoFile;
+        if (f !== undefined && f !== '' && !safeVideoSrc(f)) {
+          return err(`${p}.items[${k}].videoFile`, 'isn’t a video on this site. Use “Choose a video…” to add one, or clear it.');
         }
       }
+    }
+    if (b.type === 'announcement') {
+      if (b.tone !== undefined && b.tone !== '' && b.tone !== 'notice' && b.tone !== 'urgent') {
+        return err(p + '.tone', 'must be “notice” or “urgent”.');
+      }
+      const hasLabel = typeof b.linkLabel === 'string' && b.linkLabel.trim();
+      const hasHref = typeof b.href === 'string' && b.href.trim();
+      if (hasHref && !safeHref(b.href)) {
+        return err(p + '.href', 'isn’t a link we can use. Paste a full https:// address, or a page like events.html.');
+      }
+      if (hasLabel && !hasHref) return err(p + '.href', 'is empty, so the button would go nowhere. Add the link, or clear the button wording.');
+      if (hasHref && !hasLabel) return err(p + '.linkLabel', 'is empty, so the link would have no button. Type the button wording, or clear the link.');
     }
     if (b.type === 'group' || b.type === 'split') {
       if (depth >= LIMITS.depth) return err(p, `is nested more than ${LIMITS.depth} levels deep.`);
@@ -257,6 +275,21 @@ export function validateContent(doc) {
       return err('pages', `list the event “${e.title || e.id}” twice with two different meeting links. Use the same link in both places.`);
     }
     links[e.id] = url;
+  }
+
+  /* The same event entered twice as two SEPARATE registrations (two ids, one name) splits its
+     sign-ups in two, and only one copy's Register button is open: what happened to the Holiday
+     Brunch on 2026-10-20 (home page copy and Events page copy). List an event once, on the Events
+     page, and link to it from anywhere else. */
+  const regTitles = Object.create(null);
+  for (const e of eventItems(doc)) {
+    if (e.register !== true || typeof e.id !== 'string' || typeof e.title !== 'string') continue;
+    const key = e.title.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!key) continue;
+    if (regTitles[key] !== undefined && regTitles[key] !== e.id) {
+      return err('pages', `list the event “${e.title.trim()}” twice, as two separate registrations, so its sign-ups would be split and one Register button wouldn’t work. Keep it once, on the Events page, and remove the other copy.`);
+    }
+    regTitles[key] = e.id;
   }
 
   const bad = checkStrings(doc, 'content', null);

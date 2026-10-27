@@ -46,7 +46,10 @@ function validateSite(site) {
    server-side, before anything is committed, and stored in D1 (migration 0002) instead. Only a
    link the officer ticked "show to everyone" stays in the content, because the card needs it.
    links: id -> url to store | null to remove. An item WITHOUT a meetingLink key leaves D1 alone
-   (that is how the admin says "I didn't load or touch this one"); an empty string removes it. */
+   (that is how the admin says "I didn't load or touch this one"); an empty string removes it.
+   `online: true` is left on an event that has a link (public or private) and taken off one whose
+   link was removed. It says only THAT a link exists, never what it is, and it is what lets the
+   event card say "View the meeting link" for a Zoom meeting and never for an in-person one. */
 export function splitPrivateLinks(content) {
   const committed = JSON.parse(JSON.stringify(content));
   const links = new Map();
@@ -54,6 +57,8 @@ export function splitPrivateLinks(content) {
     if (!Object.prototype.hasOwnProperty.call(e, 'meetingLink')) continue;
     const url = safeMeetingUrl(e.meetingLink);
     if (e.register === true && typeof e.id === 'string' && EVENT_ID.test(e.id)) links.set(e.id, url || null);
+    if (url) e.online = true;
+    else delete e.online;
     if (e.meetingPublic === true && url) e.meetingLink = url;
     else delete e.meetingLink;
   }

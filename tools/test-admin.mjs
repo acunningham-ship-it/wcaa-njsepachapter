@@ -159,6 +159,17 @@ const ok = (name, cond, detail) => {
   ok('one event listed twice with two different meeting links is refused', !r.ok && /two different meeting links/.test(r.error), r);
   ok('...and listed twice with the same link is fine',
      v([ev({ register: true, id: 'same', meetingLink: 'https://zoom.us/j/1' }), ev({ register: true, id: 'same', meetingLink: 'https://zoom.us/j/1' })]).ok);
+  /* The Holiday Brunch bug (2026-10-20): the same event entered on two pages as two SEPARATE
+     registrations. Sign-ups split, and one copy's Register said "Registration isn't open". */
+  r = v([ev({ title: 'Holiday Brunch', register: true, id: 'november-1-2026-sunday-holiday-brunch' })],
+        [{ slug: 'other', navHref: 'other.html', title: 'O', sections: [{ blocks: [{ type: 'events', items: [
+          ev({ title: 'HOLIDAY  BRUNCH ', register: true, id: 'november-1-holiday-brunch' })] }] }] }]);
+  ok('one event entered twice as two separate registrations is refused, in plain words',
+     !r.ok && /twice, as two separate registrations/.test(r.error) && /Events page/.test(r.error), r);
+  ok('...but two different events (different names) each taking registration are fine',
+     v([ev({ title: 'Brunch', register: true, id: 'a' }), ev({ title: 'Tour', register: true, id: 'b' })]).ok);
+  r = v([ev({ register: true, id: 'a', online: 'yes' })]);
+  ok('the online flag must be true/false', !r.ok && /\.online$/.test(r.path), r);
   r = v([], [{ slug: 'register', navHref: 'register.html', title: 'X', hero: { title: 'X' } }]);
   ok('a page can’t take the address “register” (the registration page lives there)', !r.ok && /used by the website itself/.test(r.error), r);
   const evFields = FIELDS.events.find((f) => f.kind === 'items').fields.map((f) => f.key);
@@ -179,6 +190,34 @@ const ok = (name, cond, detail) => {
      at('+ Add an event') > -1 && at('+ Add an event') < at('class="wcaa-ev'), [at('+ Add an event'), at('class="wcaa-ev')]);
   ok('...and “+ Add a card” stays below its cards', at('+ Add a card') > at('Card one'), [at('+ Add a card'), at('Card one')]);
   ok('the public page has no Add buttons at all', !renderPage(page, {}).includes('wcaa-edit-add'));
+}
+
+/* ---------- the announcement banner + gallery video files ---------- */
+{
+  const doc = (blocks) => ({ pages: [{ slug: 'index', navHref: 'index.html', title: 'Home', sections: [{ blocks }] }] });
+  ok('an announcement with a headline, message and button is valid',
+     validateContent(doc([{ type: 'announcement', tone: 'urgent', title: 'Meeting cancelled', text: 'Snow.', linkLabel: 'Details', href: 'events.html' }])).ok);
+  ok('an EMPTY announcement is valid (it just shows nothing)', validateContent(doc([{ type: 'announcement', title: '', text: '' }])).ok);
+  let r = validateContent(doc([{ type: 'announcement', title: 'New announcement' }]));
+  ok('...but the sample headline is refused', !r.ok && /sample text/.test(r.error), r);
+  r = validateContent(doc([{ type: 'announcement', title: 'X', linkLabel: 'Go', href: 'javascript:alert(1)' }]));
+  ok('a button link that isn’t safe is refused', !r.ok && /\.href$/.test(r.path), r);
+  r = validateContent(doc([{ type: 'announcement', title: 'X', linkLabel: 'Go' }]));
+  ok('button wording with no link is refused (it would go nowhere)', !r.ok, r);
+  r = validateContent(doc([{ type: 'announcement', title: 'X', tone: 'panic' }]));
+  ok('an unknown tone is refused', !r.ok && /\.tone$/.test(r.path), r);
+  ok('the editor offers the announcement block', Array.isArray(FIELDS.announcement) && FIELDS.announcement.some((f) => f.key === 'title'));
+  ok('a gallery video file from uploads/videos/ is valid',
+     validateContent(doc([{ type: 'gallery', items: [{ src: 'uploads/site/a.jpg', videoFile: 'uploads/videos/clip-1a2b3c4d.mp4' }] }])).ok);
+  r = validateContent(doc([{ type: 'gallery', items: [{ videoFile: 'https://evil.example.com/x.mp4' }] }]));
+  ok('a video file from anywhere else is refused', !r.ok && /videoFile$/.test(r.path), r);
+  r = validateContent(doc([{ type: 'gallery', items: [{ videoFile: 'uploads/site/x.mp4' }] }]));
+  ok('...including the photo folders', !r.ok, r);
+  const html = renderPage(doc([{ type: 'gallery', items: [{ src: 'uploads/site/a.jpg', alt: 'Clip', videoFile: 'uploads/videos/clip.mp4' }] }]).pages[0], {});
+  ok('an uploaded video plays in the box with the photo as its cover, no script needed',
+     html.includes('<video class="wcaa-gal__video" src="uploads/videos/clip.mp4" poster="uploads/site/a.jpg" controls') && !html.includes('js/video.js'));
+  const ig = renderPage(doc([{ type: 'gallery', items: [{ src: 'uploads/site/a.jpg', video: 'https://www.instagram.com/p/DTnYvGvDn8k/' }] }]).pages[0], {});
+  ok('an Instagram link says “View the post”, not “Play video”', ig.includes('▶ View the post') && ig.includes('Open on Instagram') && !ig.includes('Play video'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

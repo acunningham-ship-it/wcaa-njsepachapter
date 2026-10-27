@@ -9,7 +9,7 @@
  * here, so adding a block to the renderer and forgetting the editor is a failing
  * test rather than a mystery.
  *
- * Field kinds: text · long · check · number · select · image · link · items
+ * Field kinds: text · long · check · number · select · image · video · link · items
  * `items` fields describe a repeating row and carry their own sub-fields.
  */
 
@@ -25,6 +25,15 @@ const BUTTON_ITEM = [
 ];
 
 export const FIELDS = {
+  announcement: [
+    { key: 'tone', kind: 'select', label: 'How important', options: ['notice', 'urgent'],
+      hint: '“notice” is a gold banner; “urgent” is red, for a cancellation or anything people must see.' },
+    { key: 'title', kind: 'text', label: 'Headline', hint: 'Clear the headline and the message to take the banner off the website.' },
+    { key: 'text', kind: 'long', label: 'Message' },
+    { key: 'linkLabel', kind: 'text', label: 'Button wording', hint: 'Optional. For example: Register on the Events page' },
+    { key: 'href', kind: 'link', label: 'Button links to', hint: 'Optional. For example: events.html, or a full https:// address' },
+    { key: 'kicker', kind: 'text', label: 'Small line above the headline', hint: 'Optional. Leave empty for “Announcement” (or “Urgent”).' },
+  ],
   heading: [
     { key: 'kicker', kind: 'text', label: 'Eyebrow', hint: 'Small line above the title' },
     { key: 'title', kind: 'text', label: 'Title', required: true },
@@ -72,7 +81,7 @@ export const FIELDS = {
       { key: 'register', kind: 'check', label: 'Let people register on the website',
         hint: 'Adds a “Register for this event” button. You’ll see who registered under Event sign-ups.' },
       { key: 'meetingLink', kind: 'text', label: 'Meeting link (Zoom, Google Meet or Teams)',
-        hint: 'Paste the whole link. People who register get it on their confirmation and under the event’s “List of registrants” button.' },
+        hint: 'Only for Zoom/online events. Paste the whole link. People who register get it on their confirmation and under the event’s “View who’s going” button. Leave empty for an in-person event: then the website never mentions a meeting link.' },
       { key: 'meetingPublic', kind: 'check', label: 'Show the meeting link to everyone',
         hint: 'Puts a “Join the meeting” button on the event itself, for anyone visiting the site.' },
     ] },
@@ -84,7 +93,8 @@ export const FIELDS = {
       { key: 'src', kind: 'image', label: 'Photo' },
       { key: 'alt', kind: 'text', label: 'Description', hint: 'For screen readers and when the photo fails to load' },
       { key: 'caption', kind: 'text', label: 'Caption' },
-      { key: 'video', kind: 'text', label: 'Video link', hint: 'Optional. Paste a YouTube, Facebook or Instagram link. Visitors see a Play button under the photo.' },
+      { key: 'video', kind: 'text', label: 'Video or Instagram link', hint: 'Optional. Paste a YouTube, Facebook or Instagram link (an Instagram photo post works too). Visitors see a button under the photo that opens it.' },
+      { key: 'videoFile', kind: 'video', label: 'Video file', hint: 'Optional. A short clip (MP4 or MOV, under 20 MB) that plays right on the page; the photo above becomes its cover. For longer videos, post them on YouTube, Facebook or Instagram and paste the link instead.' },
     ] },
   ],
   image: [
@@ -152,6 +162,7 @@ export const ADVANCED_KEYS = ['align', 'size', 'onDark', 'marginBottom', 'margin
    do not think in "iconRows" — and a label that reads like a developer's variable
    name is how a CMS ends up unused. */
 export const BLOCK_LABELS = {
+  announcement: ['Announcement',  'A banner for urgent news and current announcements'],
   heading:     ['Heading',        'A title with an optional eyebrow and intro line'],
   text:        ['Paragraph',      'A block of text'],
   buttons:     ['Buttons',        'One or more buttons or links'],
@@ -170,6 +181,7 @@ export const BLOCK_LABELS = {
 /* A new block of each type, so "Add block" produces something that renders
    immediately rather than an empty shell the officer has to decode. */
 export const BLOCK_DEFAULTS = {
+  announcement: () => ({ type: 'announcement', tone: 'notice', title: 'New announcement', text: '' }),
   heading:     () => ({ type: 'heading', title: 'New heading' }),
   text:        () => ({ type: 'text', text: 'New paragraph.' }),
   buttons:     () => ({ type: 'buttons', layout: 'center', items: [{ label: 'Button', href: 'index.html', variant: 'primary' }] }),

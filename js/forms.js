@@ -76,6 +76,11 @@
         var open = document.getElementById('reg-already-show');
         open.setAttribute('data-registrants', wanted);
         open.setAttribute('data-event-title', regEvent.title);
+        /* Only an online event has a meeting link to come back for; an in-person one offers the list. */
+        if (regEvent.online === true) {
+          open.setAttribute('data-online', '1');
+          open.textContent = 'Show my meeting link';
+        }
         panel.hidden = false;
         document.getElementById('reg-someone').addEventListener('click', function () {
           panel.hidden = true;

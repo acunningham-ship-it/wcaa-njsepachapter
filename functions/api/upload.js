@@ -4,6 +4,11 @@
    size, then commits it with a safe unique name into one of a FIXED set of folders.
    Returns { src }.
 
+   Videos (dest "video"): an MP4, WebM or MOV up to 20 MB goes to uploads/videos/. 20 MB because
+   Cloudflare Pages will not serve a single file over 25 MiB, and the Worker holds the file plus its
+   base64 copy in memory to commit it. Longer videos belong on YouTube/Facebook/Instagram, pasted as
+   a link — the site manager says so when a file is too big.
+
    The destination is never a caller-supplied path: "dest" is a short name that is
    looked up in DESTS, and anything not in that table is rejected. A caller can
    therefore not write outside these two folders, and cannot traverse out of them —
@@ -12,11 +17,13 @@ import { json, requireSession, ghPutFile, bytesToBase64, missingEnv } from './_l
 
 const MAX_BYTES = 20 * 1024 * 1024;   // a backstop: the site manager shrinks photos to 5 MB / 2400 px before sending
 const EXT_FOR = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const VIDEO_EXT_FOR = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
 
 /* name the client may ask for -> the only folders this endpoint can ever write to */
 const DESTS = {
   gallery: 'uploads/gallery/',  // Gallery-page photos (content/gallery.json)
   site: 'uploads/site/',        // photos placed on Home / About (content/site.json *_src keys)
+  video: 'uploads/videos/',     // short video files for the gallery (js/render.js safeVideoSrc)
 };
 
 export async function onRequest(context) {
@@ -57,18 +64,26 @@ export async function onRequest(context) {
   const dir = DESTS[typeof dest === 'string' && dest ? dest : 'gallery'];
   if (!dir) return json({ ok: false, error: 'We don’t know where that photo should go.' }, 400);
 
-  const ext = EXT_FOR[contentType];
-  if (!ext) return json({ ok: false, error: 'Photos need to be a JPG, PNG, or WebP image.' }, 400);
-  if (!bytes || bytes.length === 0) return json({ ok: false, error: 'That photo looks empty.' }, 400);
-  if (bytes.length > MAX_BYTES) return json({ ok: false, error: 'That photo is too large. Please use one under 20 MB.' }, 400);
-  if (!sniff(bytes, ext)) return json({ ok: false, error: 'That file doesn’t look like a real photo.' }, 400);
+  const isVideo = dest === 'video';
+  const ext = isVideo ? VIDEO_EXT_FOR[contentType] : EXT_FOR[contentType];
+  const thing = isVideo ? 'video' : 'photo';
+  if (!ext) {
+    return json({ ok: false, error: isVideo ? 'Videos need to be an MP4, MOV or WebM file.' : 'Photos need to be a JPG, PNG, or WebP image.' }, 400);
+  }
+  if (!bytes || bytes.length === 0) return json({ ok: false, error: `That ${thing} looks empty.` }, 400);
+  if (bytes.length > MAX_BYTES) {
+    return json({ ok: false, error: isVideo
+      ? 'That video is too large. Videos uploaded here must be under 20 MB (about 15–30 seconds from a phone). For a longer one, post it on YouTube, Facebook or Instagram and paste the link instead.'
+      : 'That photo is too large. Please use one under 20 MB.' }, 400);
+  }
+  if (!sniff(bytes, ext)) return json({ ok: false, error: `That file doesn’t look like a real ${thing}.` }, 400);
 
-  const base = slugify(String(originalName).replace(/\.[^.]+$/, '')) || 'photo';
+  const base = slugify(String(originalName).replace(/\.[^.]+$/, '')) || thing;
   const filename = `${base}-${randHex(4)}.${ext}`;
   const path = dir + filename;
 
-  const put = await ghPutFile(env, path, bytesToBase64(bytes), `Add photo ${filename} (via site manager)`, null);
-  if (!put.ok) return json({ ok: false, error: 'The photo didn’t upload. Please try again in a minute.' }, 502);
+  const put = await ghPutFile(env, path, bytesToBase64(bytes), `Add ${thing} ${filename} (via site manager)`, null);
+  if (!put.ok) return json({ ok: false, error: `The ${thing} didn’t upload. Please try again in a minute.` }, 502);
 
   return json({ ok: true, src: path });
 }
@@ -87,6 +102,9 @@ function sniff(b, ext) {
   if (b.length < 12) return false;
   if (ext === 'jpg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
   if (ext === 'png') return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+  // MP4 and MOV are both ISO media files: 'ftyp' at byte 4. WebM is Matroska: the EBML magic.
+  if (ext === 'mp4' || ext === 'mov') return b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70;
+  if (ext === 'webm') return b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3;
   if (ext === 'webp') return b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50;
   return false;
 }

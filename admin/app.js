@@ -200,7 +200,20 @@ function renderPreview() {
   // Re-rendering replaces the document; keep the officer's place on the page.
   const y = frame.contentWindow ? frame.contentWindow.scrollY : 0;
   frame.onload = () => { frame.contentWindow.scrollTo(0, y); wirePreview(frame.contentDocument); };
-  frame.srcdoc = html.replace('<head>', '<head><base href="' + new URL('..', location.href).href + '">');
+  frame.srcdoc = withLocalUploads(html).replace('<head>', '<head><base href="' + new URL('..', location.href).href + '">');
+}
+
+/* A photo or video added a moment ago is ALREADY committed, but the live site only serves it once
+   Cloudflare has rebuilt (about a minute). Until then the preview, which loads files from the live
+   site, showed an empty box — and officers read that as "the JPEG didn't upload" (notes 2026-10-27).
+   So the preview shows the file straight from this browser until the site catches up. Only the
+   preview: the page that gets saved still names the real uploads/ path. */
+const localUploads = new Map();   // 'uploads/site/x-1a2b.jpg' -> 'blob:…'
+function withLocalUploads(html) {
+  for (const [src, url] of localUploads) {
+    html = html.split('="' + src + '"').join('="' + url + '"');
+  }
+  return html;
 }
 
 function wirePreview(doc) {
@@ -535,6 +548,10 @@ function renderField(obj, spec) {
     input.readOnly = true; input.placeholder = 'No photo yet. Press “Choose a photo…”';
     row.append(uploadButton(input, obj, spec.key));
   }
+  if (spec.kind === 'video') {
+    input.readOnly = true; input.placeholder = 'No video yet. Press “Choose a video…”';
+    row.append(videoUploadButton(input, obj, spec.key));
+  }
   return row;
 }
 
@@ -628,6 +645,7 @@ function uploadButton(input, obj, key) {
       if (!res.ok || !body.ok || !body.src) throw new Error(body.error || 'Upload failed.');   // /api/upload answers { src }
       input.value = body.src;
       obj[key] = body.src;
+      localUploads.set(body.src, URL.createObjectURL(photo));
       state.notice = 'Photo added. ' + (note ? note + ' ' : '') + 'It isn’t on the website yet: press “Save changes” to publish it.';
       changed({ now: true });
     } catch (e) {
@@ -636,6 +654,52 @@ function uploadButton(input, obj, key) {
       button.textContent = 'Choose a photo…';
       button.disabled = false;
       picker.value = '';   // so choosing the same file again (after an error) still does something
+    }
+  };
+  return el('span', { className: 'upload-wrap' }, [button, picker]);
+}
+
+/* A short video file for a gallery photo. No converting here (a browser can't re-encode video
+   reliably), so the limit is said up front and checked BEFORE a long upload: 20 MB, the same cap
+   /api/upload enforces (Cloudflare won't serve a file over 25 MB). Longer: paste a link instead. */
+const VIDEO_MAX = 20 * 1024 * 1024;
+const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+function videoUploadButton(input, obj, key) {
+  const picker = el('input', { type: 'file', accept: 'video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm', className: 'hidden-file' });
+  const button = el('button', { className: 'btn btn--quiet', type: 'button', textContent: 'Choose a video…',
+    onclick: () => picker.click() });
+  picker.onchange = async () => {
+    const file = picker.files && picker.files[0];
+    if (!file) return;
+    const ext = (/\.([a-z0-9]+)$/i.exec(file.name || '') || [])[1];
+    const type = VIDEO_TYPES[String(ext || '').toLowerCase()] || (Object.values(VIDEO_TYPES).includes(file.type) ? file.type : '');
+    if (!type) { alert('That video couldn’t be added. Please choose an MP4, MOV or WebM video.'); picker.value = ''; return; }
+    if (file.size > VIDEO_MAX) {
+      alert('That video is ' + Math.round(file.size / 1048576) + ' MB. Videos uploaded here must be under 20 MB (about 15–30 seconds from a phone).\n\n' +
+            'For a longer video, post it on YouTube, Facebook or Instagram and paste its link into “Video or Instagram link” instead.');
+      picker.value = '';
+      return;
+    }
+    button.textContent = 'Uploading video…';
+    button.disabled = true;
+    try {
+      const form = new FormData();
+      form.append('file', new File([file], file.name || ('video.' + ext), { type }));
+      form.append('dest', 'video');
+      const res = await fetch('../api/upload', { method: 'POST', body: form });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.ok || !body.src) throw new Error(body.error || 'Upload failed.');
+      input.value = body.src;
+      obj[key] = body.src;
+      localUploads.set(body.src, URL.createObjectURL(file));
+      state.notice = 'Video added. It isn’t on the website yet: press “Save changes” to publish it.';
+      changed({ now: true });
+    } catch (e) {
+      alert('That video couldn’t be uploaded. ' + (e.message || ''));
+    } finally {
+      button.textContent = 'Choose a video…';
+      button.disabled = false;
+      picker.value = '';
     }
   };
   return el('span', { className: 'upload-wrap' }, [button, picker]);

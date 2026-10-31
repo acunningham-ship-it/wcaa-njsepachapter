@@ -27,7 +27,7 @@ export async function onRequest(context) {
 
   if (request.method === 'GET') {
     const wantCsv = new URL(request.url).searchParams.get('format') === 'csv';
-    let rows, total;
+    let rows, total, pending = 0;
     try {
       const r = await env.DB.prepare(
         `SELECT id, name, email, source, created_at, updated_at
@@ -38,6 +38,21 @@ export async function onRequest(context) {
       rows = r.results || [];
       const c = await env.DB.prepare('SELECT COUNT(*) AS n FROM mailing_list').first();
       total = c ? Number(c.n) : rows.length;
+
+      /* How many event registrants are not on this list yet. The list only started filling itself
+         when 0006 went live, so everyone who registered before then is in `rsvps` alone; the panel
+         uses this number to offer the one-time catch-up (mailing-list/backfill.js). A failure here
+         must not stop the list loading, so an old database without `rsvps` just reads 0. */
+      try {
+        const p = await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM (
+             SELECT DISTINCT r.email_key
+               FROM rsvps r
+              WHERE r.email_key IS NOT NULL AND TRIM(r.email_key) <> ''
+                AND NOT EXISTS (SELECT 1 FROM mailing_list m WHERE m.email_key = r.email_key))`
+        ).first();
+        pending = p ? Number(p.n) : 0;
+      } catch { /* no rsvps table: nothing to catch up */ }
     } catch {
       /* Not a 500: the officer needs to know WHICH thing is missing, and the answer is a
          one-time schema update they can apply from this panel (/api/migrate). `needsSchema`
@@ -56,6 +71,7 @@ export async function onRequest(context) {
     return json({
       ok: true,
       count: total,
+      pending,
       truncated: total > rows.length,
       subscribers: rows.map((r) => ({
         id: r.id, name: r.name || '', email: r.email, source: r.source, added: r.created_at,

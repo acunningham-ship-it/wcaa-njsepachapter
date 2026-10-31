@@ -25,6 +25,7 @@ import { onRequest as listApi } from '../functions/api/mailing-list.js';
 import { onRequest as importCsv } from '../functions/api/mailing-list/import.js';
 import { onRequest as remove } from '../functions/api/mailing-list/delete.js';
 import { onRequest as sendAll } from '../functions/api/mailing-list/send.js';
+import { onRequest as backfillList } from '../functions/api/mailing-list/backfill.js';
 import { onRequest as rsvp } from '../functions/api/rsvp.js';
 import { parseCsv, peopleFromCsv } from '../functions/api/_mailing.js';
 
@@ -100,6 +101,7 @@ const add = (env, body, opts = {}) => call(listApi, 'POST', { env, body, ...opts
 const importFile = (env, csv, opts = {}) => call(importCsv, 'POST', { env, body: { csv }, path: '/api/mailing-list/import', ...opts });
 const del = (env, body, opts = {}) => call(remove, 'POST', { env, body, path: '/api/mailing-list/delete', ...opts });
 const blast = (env, body, opts = {}) => call(sendAll, 'POST', { env, body, path: '/api/mailing-list/send', ...opts });
+const backfill = (env, opts = {}) => call(backfillList, 'POST', { env, path: '/api/mailing-list/backfill', ...opts });
 
 const GOOD = { subject: 'Chapter news for November', message: 'Hi all,\nMeeting is on the 12th.' };
 const seedList = (DB, people) => {
@@ -431,6 +433,57 @@ const seedList = (DB, people) => {
   await add(env, { name: '', email: 'denise@x.org' });
   ok('adding an event registrant by hand changes nothing (they are already there, name kept)',
      rows(DB).length === 2 && rows(DB)[0].name === 'Denise Canney', rows(DB));
+}
+
+/* ================= catching up with sign-ups taken before the list existed =================
+   The list only fills itself from the moment 0006 is live. Everyone who registered earlier is in
+   `rsvps` and nowhere else, which is exactly the state of the real chapter database: 10 Holiday
+   Brunch registrations, none of them on the chapter list. */
+{
+  const DB = makeDB();
+  const env = envOf(DB);
+  DB.raw.prepare("INSERT INTO events (id,title) VALUES ('holiday-party','Holiday party'),('zoom-night','Zoom night')").run();
+  const addRsvp = DB.raw.prepare('INSERT INTO rsvps (event_id,name,email,email_key,created_at) VALUES (?,?,?,?,?)');
+  addRsvp.run('holiday-party', 'Denise Canney', 'denise@x.org', 'denise@x.org', '2026-09-01T00:00:00Z');
+  addRsvp.run('zoom-night', '', 'DENISE@X.ORG', 'denise@x.org', '2026-10-01T00:00:00Z');   // later, no name
+  addRsvp.run('holiday-party', 'Helene Smith', 'helene@x.org', 'helene@x.org', '2026-09-02T00:00:00Z');
+  addRsvp.run('zoom-night', 'Oliver Old', 'old@x.org', 'old@x.org', '2026-09-03T00:00:00Z');
+
+  // Two people an officer already typed in: one has a name worth keeping, one is blank.
+  seedList(DB, [['D. Canney', 'denise@x.org']]);
+  DB.raw.prepare("INSERT INTO mailing_list (name,email,email_key,source) VALUES ('', 'old@x.org', 'old@x.org', 'manual')").run();
+
+  let g = await get(env);
+  ok('the panel counts the event sign-ups missing from the list (distinct addresses, not RSVPs)',
+     g.json.pending === 1, g.json);
+  ok('  ...and the count is not confused by the two RSVPs from one person',
+     DB.raw.prepare('SELECT COUNT(*) n FROM rsvps').get().n === 4 && rows(DB).length === 2, rows(DB));
+
+  let r = await backfill(env, { auth: false });
+  ok('backfilling with no session → 401, and nothing written', r.status === 401 && rows(DB).length === 2, r.json);
+
+  r = await backfill(env);
+  ok('backfilling adds the one missing person', r.status === 200 && r.json.ok === true && r.json.added === 1, r.json);
+  ok('  ...one row per address, even though Denise signed up twice',
+     rows(DB).filter((x) => x.email_key === 'denise@x.org').length === 1, rows(DB));
+  ok('  ...a name typed in by hand is kept', rows(DB).find((x) => x.email_key === 'denise@x.org').name === 'D. Canney', rows(DB));
+  ok('  ...a blank name already on the list is filled from the sign-up',
+     rows(DB).find((x) => x.email_key === 'old@x.org').name === 'Oliver Old', rows(DB));
+  ok('  ...and the person only on an event arrives with their name and source "rsvp"',
+     rows(DB).find((x) => x.email_key === 'helene@x.org')?.name === 'Helene Smith'
+     && rows(DB).find((x) => x.email_key === 'helene@x.org')?.source === 'rsvp', rows(DB));
+
+  g = await get(env);
+  ok('after catching up, the panel has nothing left to offer', g.json.pending === 0, g.json);
+  ok('  ...and the list is exactly the people involved', g.json.count === 3, g.json);
+
+  r = await backfill(env);
+  ok('pressing it again adds nobody (0 added, list unchanged)', r.json.added === 0 && rows(DB).length === 3, r.json);
+
+  const BEFORE = makeDB(ALL.slice(0, 5));
+  r = await backfill(envOf(BEFORE));
+  ok('before migration 0006: caught clearly, and flagged for the panel’s Set up button',
+     r.status === 409 && r.json.needsSchema === true, r.json);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -92,6 +92,7 @@ the endpoint is right.
 | `GET /api/mailing-list` | officer | the chapter's email list (`?format=csv` to download it) |
 | `POST /api/mailing-list` | officer | add one person, by name and email |
 | `POST /api/mailing-list/import` | officer | add everyone in a `.csv` (deduplicated) |
+| `POST /api/mailing-list/backfill` | officer | catch up: add everyone already in `rsvps` (deduplicated) |
 | `POST /api/mailing-list/delete` | officer | take one person off the list |
 | `POST /api/logout` | anyone | sign out: clears the cookie and kills that session token on the server |
 | `GET/POST /api/migrate` | officer | check / apply the database schema |
@@ -142,6 +143,15 @@ spreadsheet uploaded twice) is a single `ON CONFLICT` upsert (`functions/api/_ma
 signing up for three events, or uploading the same file twice, leaves one person — not three, and
 not a duplicate that gets the announcement twice. A name an officer typed by hand is never replaced
 by a later sign-up's version of it; a blank name is filled in.
+
+**Catching up with sign-ups taken before the list existed.** The list only fills itself from the
+moment migration 0006 is live, so everyone who registered earlier is in `rsvps` and nowhere else.
+`GET /api/mailing-list` reports how many distinct addresses that is (`pending`), and while it is
+above zero the tab shows **Add everyone from event sign-ups** (`POST /api/mailing-list/backfill`).
+It is one upsert over a deduplicated view of `rsvps` — most recent name per address, preferring a
+row that actually has one — so pressing it twice adds nobody, never creates a second row for someone
+who signed up for several events, keeps a hand-typed name, and fills a blank one. It reports how many
+were added as the change in the list's size, so a re-run says "0 added" rather than counting rows.
 
 **Importing a spreadsheet** needs no column mapping. For each row the endpoint takes the cell that
 *is* an email address as the address and the remaining cells as the name, so `Name,Email`,

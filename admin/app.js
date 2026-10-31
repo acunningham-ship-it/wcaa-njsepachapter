@@ -1256,6 +1256,7 @@ async function loadList(flash = null) {
  
   if (flash) list.append(el('p', { className: 'status' + (flash.kind ? ' status--' + flash.kind : ''), role: 'status', textContent: flash.text }));
 
+  if (data.pending > 0) list.append(backfillCard(data.pending));
   list.append(announcementCard(who, count));
   list.append(addOneCard());
   list.append(importCard());
@@ -1288,6 +1289,37 @@ function schemaCard() {
     loadList({ text: 'The email list is ready. Anyone who signs up for an event from now on is added automatically.', kind: 'good' });
   });
   card.append(el('div', { className: 'ev-actions' }, [go]), said);
+  return card;
+}
+
+/* Everyone who signed up for an event BEFORE this list existed is in `rsvps` and nowhere else —
+   the list only started filling itself when migration 0006 went live. The server counts them
+   (`pending`), so this card appears only when there is actually a catch-up to do, and reports what
+   it did. Safe to press again: the endpoint is an upsert, so it never duplicates and never
+   replaces a name typed by hand. */
+function backfillCard(pending) {
+  const who = `${pending} ${pending === 1 ? 'person has' : 'people have'}`;
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'Add everyone from event sign-ups' }),
+    el('p', { className: 'hint', textContent: `${who} registered for an event but ${pending === 1 ? 'isn’t' : 'aren’t'} on this list. That is normal for anyone who signed up before the list existed.` }),
+    el('p', { className: 'hint', textContent: 'Adding them is safe: anyone already on the list is skipped, nobody gets a second row, and a name you typed in yourself is kept.' }),
+  ]);
+  const go = el('button', { className: 'btn btn--primary', type: 'button',
+    textContent: pending === 1 ? 'Add this person' : `Add these ${pending} people` });
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    const res = await fetch('../api/mailing-list/backfill', { method: 'POST' }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (!res || !out.ok) {
+      go.disabled = false;
+      alert(out.error || 'That didn’t work. Please check your connection and try again.');
+      return;
+    }
+    loadList(out.added
+      ? { text: `${out.added} ${out.added === 1 ? 'person was' : 'people were'} added from event sign-ups.`, kind: 'good' }
+      : { text: 'Everyone from event sign-ups is already on the list.' });
+  });
+  card.append(el('div', { className: 'ev-actions' }, [go]));
   return card;
 }
 

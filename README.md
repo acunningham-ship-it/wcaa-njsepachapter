@@ -162,6 +162,27 @@ capped at 1,000 people and one import at 5,000 addresses.)
 
 Nothing here is committed to the repo: it is D1 only, same rule as the RSVPs.
 
+**Before the table exists**, the tab used to say "ask your web person" and stop. It now shows a
+one-time **Set up the email list** button that calls `POST /api/migrate` and reloads. It is safe to
+press more than once: every migration is `CREATE … IF NOT EXISTS`, so it cannot change or empty a
+list that is already there.
+
+### Event sign-ups that are no longer on the website
+
+An `events` row is registration state; the website is content. They are kept in step by
+`syncRegistration` in `functions/api/save.js`, which reconciles against the **whole table**, not just
+the previous version of `pages.json`. That matters because a commit made straight to the repo never
+runs `/api/save`: when the old copy of Holiday Brunch was removed that way, its D1 row stayed open
+with nobody on it and the same event appeared twice on the Sign-ups screen.
+
+On every save, a row whose event is no longer anywhere in the content is deleted when it has no
+sign-ups (it can never be reached again — `register.html` only exists for events in the content) and
+kept but closed when it has some, so those people can still be read and exported. The delete
+re-checks emptiness in the same statement, exactly like `/api/events/delete`, so an RSVP arriving in
+the gap cannot be cascade-deleted. An event that is still on the page with registration switched off
+is **not** stale: its row stays, closed. The Sign-ups screen also marks these leftovers and offers to
+remove the empty ones in one click, for a database that already has one.
+
 ### Setting up the database
 
 The schema is not created on first request — an unauthenticated stranger's RSVP is
@@ -172,7 +193,9 @@ npx wrangler d1 execute wcaa-rsvps --remote --file=migrations/0001_rsvps.sql
 ```
 
 ...or sign in and `POST /api/migrate`, which runs the same file and then reports
-which tables actually exist rather than that the statements were sent.
+which tables actually exist rather than that the statements were sent. In the panel, the
+**Email list** tab's one-time **Set up the email list** button does the same thing without a
+terminal; it appears whenever `mailing_list` is missing.
 
 ### The old React prototype
 

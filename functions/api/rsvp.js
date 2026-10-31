@@ -21,6 +21,7 @@ import { safeMeetingUrl } from '../../js/render.js';
 import { readBody, validate, text, multiline, email as emailField, phone as phoneField, count } from './_input.js';
 import { verifyTurnstile } from './_turnstile.js';
 import { honeypotFilled, rateLimited, RATE_LIMIT_MESSAGE } from './_guard.js';
+import { addSubscriber } from './_mailing.js';
 
 const GENERIC = 'Something went wrong sending your RSVP. Please try again, or contact the chapter directly.';
 
@@ -134,6 +135,18 @@ export async function onRequest(context) {
     const link = await env.DB.prepare('SELECT url FROM event_links WHERE event_id = ?').bind(f.event_id).first();
     meeting = link && safeMeetingUrl(link.url) ? safeMeetingUrl(link.url) : null;
   } catch { /* migration 0002 not applied yet */ }
+
+  /* The chapter also keeps ONE email list, separate from any event's sign-ups (migration 0006), and
+     every sign-up adds the person to it. That is how the list fills itself, and it is why the panel
+     has something to send an announcement to.
+
+     ⛔ BEST-EFFORT, AFTER the sign-up already exists. The registration above is the thing the person
+     asked for; the list is a convenience on top of it. If this fails — 0006 not applied, D1 having a
+     bad minute — they are still registered and must not be shown an error. Their seat is already
+     written, so nothing is lost: the next event they sign up for, or the officer, adds them later. */
+  try {
+    await addSubscriber(env, { name: f.name, email: f.email, key: f.email_key, source: 'rsvp' });
+  } catch { /* migration 0006 not applied yet */ }
 
   return json({ ok: true, event: event.title, guests: f.guests, meeting });
 }

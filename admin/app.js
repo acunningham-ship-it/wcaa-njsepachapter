@@ -1009,13 +1009,15 @@ function setMode(m) {
   $('#content-view').hidden = !content;
   $('#savebar').hidden = !content;
   $('#events-view').hidden = m !== 'events';
+  $('#list-view').hidden = m !== 'list';
   $('#security-view').hidden = m !== 'security';
   if (!content) { state.drawer = null; renderDrawer(); }
-  for (const k of ['content', 'events', 'security']) {
+  for (const k of ['content', 'events', 'list', 'security']) {
     $('#mode-' + k).classList.toggle('is-on', k === m);
     $('#mode-' + k).setAttribute('aria-pressed', k === m ? 'true' : 'false');
   }
   if (m === 'events') loadEvents();
+  if (m === 'list') loadList();
   if (m === 'security') loadSecurity();
 }
 
@@ -1159,6 +1161,171 @@ function emailForm(ev, count, host) {
     return '';
   });
   return form;
+}
+
+/* ---------- the chapter's email list ----------
+   functions/api/mailing-list.js and its import/delete/send siblings. ONE row per address, filled
+   automatically by every event sign-up, and used for announcements that are not about one event.
+
+   Kept apart from "Event sign-ups" on purpose: an event's list is a fact about one Thursday, and
+   clearing it out must not empty the chapter's own list — nor should the chapter list shrink when
+   an event is over. The database enforces one row per address (migration 0006), so everything on
+   this page — a sign-up, a name typed in by hand, a spreadsheet uploaded twice — lands on the same
+   person rather than a second copy. */
+
+async function loadList(flash = null) {
+  const view = $('#list-view');
+  view.textContent = '';
+  view.append(el('h1', { className: 'ev-h', textContent: 'Chapter email list' }));
+  view.append(el('p', { className: 'hint', textContent: 'Everyone the chapter can email. People are added automatically when they sign up for an event on the website. Sending from this page goes to the whole list and has nothing to do with any one event.' }));
+
+  const list = el('div', { className: 'ev-list', textContent: 'Loading…' });
+  view.append(list);
+
+  let data;
+  try { data = await fetch('../api/mailing-list').then((x) => x.json()); }
+  catch { list.textContent = 'The email list couldn’t be loaded. Please refresh the page.'; return; }
+  list.textContent = '';
+  if (!data.ok) { list.append(el('p', { className: 'empty', textContent: data.error || 'The email list couldn’t be loaded.' })); return; }
+
+  const people = data.subscribers || [];
+  const count = Number(data.count || 0);
+  const who = `${count} ${count === 1 ? 'person' : 'people'}`;
+  list.append(el('p', { className: 'ev-count', textContent: `${who} on the list.` }));
+ 
+  if (flash) list.append(el('p', { className: 'status' + (flash.kind ? ' status--' + flash.kind : ''), role: 'status', textContent: flash.text }));
+
+  list.append(announcementCard(who, count));
+  list.append(addOneCard());
+  list.append(importCard());
+  list.append(listTable(people, data.truncated));
+}
+
+/* One message to the whole list. functions/api/mailing-list/send.js sends a separate copy to each
+   person, so nobody sees anyone else's address, and reports how many actually went out. */
+function announcementCard(who, count) {
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'Send everyone an announcement' }),
+  ]);
+  if (!count) {
+    card.append(el('p', { className: 'empty', textContent: 'There’s nobody to email yet. Add someone below, or import a spreadsheet, and the button appears here.' }));
+    return card;
+  }
+  const subject = el('input', { className: 'input', type: 'text', maxLength: 150, autocomplete: 'off' });
+  const message = el('textarea', { className: 'input', rows: 8 });
+  const said = el('p', { className: 'status', role: 'status' });
+  card.append(el('p', { className: 'hint', textContent: `This sends one email to all ${who} on the list. Each person gets their own copy, so nobody sees anyone else’s address. Replies come to the chapter’s reply address, and a line saying how to be taken off the list is added at the bottom for you.` }));
+  card.append(secForm([
+    secField('Subject', subject),
+    secField('Message', message),
+  ], `Send to ${who}`, async () => {
+    if (!subject.value.trim() || !message.value.trim()) return 'Please write a subject and a message.';
+    if (!confirm(`Send this email to ${who} on the chapter list? It can’t be taken back.`)) return '';
+    const res = await fetch('../api/mailing-list/send', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ subject: subject.value, message: message.value }) }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (!res || !out.ok) return out.error || 'That didn’t work, so nothing was sent. Please check your connection and try again.';
+    subject.value = '';
+    message.value = '';
+    said.className = out.failed ? 'status status--bad' : 'status status--good';
+    said.textContent = out.failed
+      ? `Sent to ${out.delivered} of ${out.recipients} people. ${out.failed} didn’t go out — please wait a minute, then email the rest.`
+      : `Sent to ${out.delivered} ${out.delivered === 1 ? 'person' : 'people'}.`;
+    return '';
+  }));
+  card.append(said);
+  return card;
+}
+
+function addOneCard() {
+  const name = el('input', { className: 'input', type: 'text', maxLength: 120, autocomplete: 'off' });
+  const email = el('input', { className: 'input', type: 'email', maxLength: 200, autocomplete: 'off', inputMode: 'email' });
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'Add one person' }),
+    el('p', { className: 'hint', textContent: 'For someone who asked to be added in person or by phone. If they’re already on the list, nothing is duplicated.' }),
+  ]);
+  card.append(secForm([
+    secField('Name (leave it blank if you don’t know it)', name),
+    secField('Email address', email),
+  ], 'Add this person', async () => {
+    const address = email.value.trim();
+    if (!address) return 'Please type the email address.';
+    const res = await fetch('../api/mailing-list', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: name.value, email: address }) }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (!res || !out.ok) return out.error || 'That didn’t work. Please check your connection and try again.';
+    loadList(out.added
+      ? { text: `${address} was added to the list.`, kind: 'good' }
+      : { text: `${address} was already on the list, so nothing changed.` });
+    return '';
+  }));
+  return card;
+}
+
+/* A .csv, read in the browser and posted as text. Column order does not matter and a header row is
+   fine: the endpoint takes whichever cell is an email address as the address and the rest as the
+   name (_mailing.js). Duplicates — in the file, or already on the list — collapse to one row. */
+function importCard() {
+  const file = el('input', { className: 'input', type: 'file', accept: '.csv,text/csv' });
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'Add everyone in a spreadsheet' }),
+    el('p', { className: 'hint', textContent: 'Choose a .csv file with names and email addresses in it. Save it as “CSV (comma separated)” from Excel, Numbers or Google Sheets. Anybody already on the list is skipped, so uploading the same file twice is safe.' }),
+  ]);
+  card.append(secForm([secField('The .csv file', file)], 'Add everyone in the file', async () => {
+    const chosen = file.files && file.files[0];
+    if (!chosen) return 'Please choose a .csv file first.';
+    if (chosen.size > 1000000) return 'That file is too big. Please split it into smaller files.';
+    let csv;
+    try { csv = await chosen.text(); } catch { return 'That file couldn’t be read. Please save it again as a .csv file and try once more.'; }
+    const res = await fetch('../api/mailing-list/import', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ csv }) }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (!res || !out.ok) return out.error || 'That didn’t work. Please check your connection and try again.';
+    const bits = [out.added ? `${out.added} added` : 'nobody new to add'];
+    if (out.already) bits.push(`${out.already} already on the list`);
+    if (out.skipped) bits.push(`${out.skipped} ${out.skipped === 1 ? 'line' : 'lines'} with no email address skipped`);
+    loadList({ text: `${chosen.name}: ${bits.join(', ')}.`, kind: out.added ? 'good' : null });
+    return '';
+  }));
+  return card;
+}
+
+function listTable(people, truncated) {
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'Everyone on the list' }),
+  ]);
+  if (!people.length) {
+    card.append(el('p', { className: 'empty', textContent: 'Nobody is on the list yet. Add someone above, or upload a spreadsheet.' }));
+    return card;
+  }
+  card.append(el('div', { className: 'ev-actions' }, [
+    el('a', { className: 'btn btn--quiet', href: '../api/mailing-list?format=csv', textContent: 'Download the list (spreadsheet)' }),
+  ]));
+  const table = el('table', { className: 'ev-table' });
+  table.append(el('thead', {}, el('tr', {}, ['Name', 'Email', 'Added', ''].map((h) => el('th', { scope: 'col', textContent: h })))));
+  const tb = el('tbody');
+  for (const p of people) {
+    const del = el('button', { className: 'btn btn--danger btn--sm', type: 'button', textContent: 'Remove' });
+    del.addEventListener('click', async () => {
+      if (!confirm(`Take ${p.name || p.email} off the chapter email list? They will stop getting announcements.`)) return;
+      del.disabled = true;
+      const res = await fetch('../api/mailing-list/delete', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: p.id }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+      if (!res.ok) { del.disabled = false; alert(res.error || 'That couldn’t be removed.'); return; }
+      loadList({ text: `${p.name || p.email} was taken off the list.` });
+    });
+    // Every value goes in as text (el sets textContent): names and emails come from strangers.
+    tb.append(el('tr', {}, [
+      el('td', { textContent: p.name || '—' }),
+      el('td', {}, el('a', { href: 'mailto:' + p.email, textContent: p.email })),
+      el('td', { textContent: when(p.added) }),
+      el('td', {}, del),
+    ]));
+  }
+  table.append(tb);
+  card.append(el('div', { className: 'ev-table-wrap' }, table));
+  if (truncated) card.append(el('p', { className: 'hint', textContent: 'Only the first 2,000 are shown here. Download the spreadsheet for the whole list.' }));
+  return card;
 }
 
 /* ---------- the sign-in code (2FA) ----------
@@ -1334,6 +1501,7 @@ $('#status').addEventListener('click', () => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.drawer) closeDrawer(); });
 $('#mode-content').addEventListener('click', () => setMode('content'));
 $('#mode-events').addEventListener('click', () => setMode('events'));
+$('#mode-list').addEventListener('click', () => setMode('list'));
 $('#mode-security').addEventListener('click', () => setMode('security'));
 
 /* The session cookie is HttpOnly, so the page cannot read it. /api/session is the

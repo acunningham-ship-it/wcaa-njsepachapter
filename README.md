@@ -88,6 +88,11 @@ the endpoint is right.
 | `POST /api/rsvps/delete` | officer | remove a registration |
 | `GET/POST /api/messages` | officer | read, mark handled, delete |
 | `POST /api/email` | officer | email everyone registered for an event (one message, all in BCC) |
+| `POST /api/mailing-list/send` | officer | one announcement to the whole chapter list |
+| `GET /api/mailing-list` | officer | the chapter's email list (`?format=csv` to download it) |
+| `POST /api/mailing-list` | officer | add one person, by name and email |
+| `POST /api/mailing-list/import` | officer | add everyone in a `.csv` (deduplicated) |
+| `POST /api/mailing-list/delete` | officer | take one person off the list |
 | `POST /api/logout` | anyone | sign out: clears the cookie and kills that session token on the server |
 | `GET/POST /api/migrate` | officer | check / apply the database schema |
 
@@ -117,6 +122,45 @@ It needs, as Cloudflare Pages **secrets/variables**: `RESEND_API_KEY` (secret, r
 (default `dcanney@verizon.net`). Without the key the button answers "Email isn't set up on the website yet".
 Resend takes 50 addresses per message, so a list over 49 is refused rather than split. One-time DNS setup:
 `~/reports/wcaa-email-setup-2026-10-13.md` (kept outside the repo).
+
+### The chapter email list
+
+The **Email list** tab is the chapter's own address book, and it is deliberately not the same thing
+as an event's sign-ups. An RSVP is a fact about one Thursday (a seat, a phone number); the list is
+who the chapter can reach at all, and it outlives every event. So they are separate tables
+(`rsvps` and `mailing_list`), and deleting an event's sign-up list does not take anybody off the
+chapter list.
+
+**It fills itself.** Every successful event sign-up adds that person's name and email
+(`functions/api/rsvp.js`). That is best-effort on purpose: the sign-up is already stored, so a
+failure to add them here — including the table not existing yet — is never shown to the person
+registering, and never costs them their seat.
+
+**One row per address, enforced by the database.** `mailing_list.email_key` is the trimmed,
+lowercased address with a UNIQUE index on it, and every path (a sign-up, a name typed in by hand, a
+spreadsheet uploaded twice) is a single `ON CONFLICT` upsert (`functions/api/_mailing.js`). So
+signing up for three events, or uploading the same file twice, leaves one person — not three, and
+not a duplicate that gets the announcement twice. A name an officer typed by hand is never replaced
+by a later sign-up's version of it; a blank name is filled in.
+
+**Importing a spreadsheet** needs no column mapping. For each row the endpoint takes the cell that
+*is* an email address as the address and the remaining cells as the name, so `Name,Email`,
+`Email,First,Last` and a bare column of addresses all read correctly (quoted cells, CRLF and an
+Excel BOM included). The reply says what happened — added, already on the list, and lines with no
+address that were skipped — and it is true on a re-import because "added" is measured as the change
+in the list's size, not as rows processed.
+
+**Sending an announcement** goes to every address, one message per person, through Resend's batch
+endpoint (100 messages per call). It is not the BCC trick `/api/email` uses: that caps at 50
+addresses in total, which cannot reach a chapter list, and splitting it would deliver duplicates to
+anyone on two batches. Each person gets their own message with only their own address on it, replies
+come to the chapter's reply address, and the server appends both the usual inquiries line and how to
+be taken off the list. A batch that fails does not stop the rest; the officer is told exactly how
+many were delivered and how many were not, and `list_sends` records the same numbers. (Resend's free
+tier allows 2 requests a second, so there is a short pause between batches. One announcement is
+capped at 1,000 people and one import at 5,000 addresses.)
+
+Nothing here is committed to the repo: it is D1 only, same rule as the RSVPs.
 
 ### Setting up the database
 

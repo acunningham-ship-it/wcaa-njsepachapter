@@ -249,3 +249,8 @@ textarea.input { resize: vertical; }
 
 .ev-email { margin: 0 0 var(--space-5); }
 .ev-email .sec-form { max-width: 560px; }
+
+/* ---------- chapter email list ---------- */
+.ev-list .sec-form { max-width: 560px; }        /* the announcement composer needs room for a message */
+.ev-list .sec-form textarea.input { min-height: 170px; }
+.ev-list .sec-form input[type="file"] { padding: 8px 10px; font-size: 17px; }

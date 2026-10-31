@@ -42,6 +42,7 @@
     <nav class="modes" aria-label="What to work on">
       <button class="mode is-on" id="mode-content" type="button" aria-pressed="true">Change the website</button>
       <button class="mode" id="mode-events" type="button" aria-pressed="false">Event sign-ups</button>
+      <button class="mode" id="mode-list" type="button" aria-pressed="false">Email list</button>
       <button class="mode" id="mode-security" type="button" aria-pressed="false">Sign-in code</button>
     </nav>
     <button class="bar-save" id="save-top" type="button" disabled>Save changes</button>
@@ -93,6 +94,9 @@
 
   <!-- Who registered for what. Lives in the database, never in the website's files. -->
   <main class="events-view" id="events-view" hidden></main>
+
+  <!-- The chapter's own email list (not an event's sign-ups): add, import a spreadsheet, send everyone. app.js loadList. -->
+  <main class="events-view" id="list-view" hidden></main>
 
   <!-- The sign-in code (2FA): set up, add a phone, switch off. app.js loadSecurity. -->
   <main class="events-view" id="security-view" hidden></main>

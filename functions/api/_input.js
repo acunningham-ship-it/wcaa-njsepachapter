@@ -24,7 +24,7 @@ const CONTROL_STRICT = /[\u0000-\u001F\u007F]/;                   // single-line
    catch a typo and refuse a header-injection attempt, not to adjudicate exotic but
    legal addresses — that argument has no winner and rejecting a real member's
    address is the worse failure. A confirmation email bouncing is the real check. */
-const EMAIL = /^[^\s@,;:<>"'\\]{1,64}@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+export const EMAIL = /^[^\s@,;:<>"'\\]{1,64}@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
 
 const PHONE = /^[+0-9()\-.\s]{7,40}$/;
 

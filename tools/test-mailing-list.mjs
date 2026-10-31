@@ -147,6 +147,7 @@ const seedList = (DB, people) => {
   const env = envOf(DB);
   const r = await get(env);
   ok('before migration 0006: listing says the list isn’t set up, rather than crashing', r.status === 409 && /isn’t set up/.test(r.json.error), r.json);
+  ok('  ...and flags it as a schema the panel can apply itself', r.json.needsSchema === true, r.json);
   const w = await blast(env, GOOD);
   ok('  ...and sending refuses the same way, with no provider call', w.status === 409 && requests.length === 0, w.json);
 }

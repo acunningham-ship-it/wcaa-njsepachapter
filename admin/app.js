@@ -1040,11 +1040,58 @@ async function loadEvents() {
     events = r.events;
   } catch (e) { list.textContent = 'The sign-ups couldn’t be loaded. ' + (e.message || 'Please refresh the page.'); return; }
   list.textContent = '';
+
+  /* An events ROW is registration state; the website is content. They normally agree, because
+     every save reconciles them (functions/api/save.js syncRegistration). But a row can be left
+     behind by an event whose address changed, or by a change committed straight to the repo
+     instead of through this editor. Such a row is not on the website any more, so no Register
+     button can reach it — it is only confusing on this screen (the same event appearing twice).
+     Read the ids the site actually lists from the content the editor already loaded. */
+  const onSite = new Set(eventItems(state.content || { pages: [] }).map((e) => e.id).filter(Boolean));
+  const isLive = (ev) => onSite.has(ev.id);
+
+  /* Live events first (each group keeps the server's newest-first order), so the officer's eye
+     lands on the lists that still matter. Array.prototype.sort is stable. */
+  events = events.slice().sort((a, b) => Number(isLive(b)) - Number(isLive(a)));
+
   if (!events.length) { list.append(el('p', { className: 'empty', textContent: 'No events are taking registrations yet.' })); return; }
-  events.forEach((ev) => list.append(eventCard(ev)));
+
+  /* Empty stale rows are safe to remove in one go: nothing can be lost, and they would otherwise
+     sit here forever, making yesterday's version of an event look like a second event. */
+  const staleEmpty = events.filter((ev) => !isLive(ev) && !(ev.seats || 0));
+  if (staleEmpty.length) list.append(staleCleanupCard(staleEmpty));
+
+  events.forEach((ev) => list.append(eventCard(ev, isLive(ev))));
 }
 
-function eventCard(ev) {
+/* "Holiday Brunch" twice, one with nobody on it, is almost always this: the event's sign-up
+   address changed (or it was edited straight in the repo), the old row was never cleaned up.
+   Removing the empty ones is the fix, and doing it here means she does not have to hunt for the
+   one card that happens to have a Delete button. */
+function staleCleanupCard(stale) {
+  const names = stale.map((ev) => `“${ev.title}”`).join(', ');
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'No longer on the website' }),
+    el('p', { className: 'hint', textContent: `${names} ${stale.length === 1 ? 'is' : 'are'} not on the website any more, so nobody can register for ${stale.length === 1 ? 'it' : 'them'}. ${stale.length === 1 ? 'It has' : 'They have'} nobody registered, so nothing is lost by removing ${stale.length === 1 ? 'it' : 'them'}.` }),
+    el('p', { className: 'hint', textContent: 'This is what makes one event appear twice after its address or name changes. Removing the leftover copy leaves the real one alone.' }),
+  ]);
+  const clean = el('button', { className: 'btn btn--danger', type: 'button',
+    textContent: stale.length === 1 ? 'Remove it' : `Remove all ${stale.length}` });
+  clean.addEventListener('click', async () => {
+    if (!confirm(`Remove ${stale.length === 1 ? 'the leftover sign-up list' : `the ${stale.length} leftover sign-up lists`} for ${names}? ${stale.length === 1 ? 'It has' : 'They have'} nobody registered.`)) return;
+    clean.disabled = true;
+    for (const ev of stale) {
+      const res = await fetch('../api/events/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ev.id }) }).then((x) => x.json()).catch(() => ({ ok: false, error: 'Network error.' }));
+      if (!res.ok) { clean.disabled = false; alert(res.error || 'That couldn’t be removed.'); loadEvents(); return; }
+    }
+    loadEvents();
+  });
+  card.append(el('div', { className: 'ev-actions' }, [clean]));
+  return card;
+}
+
+function eventCard(ev, isLive = true) {
   const seats = ev.seats || 0;
   const closed = !!ev.closed;
   const box = el('div', { className: 'ev-rsvps', hidden: true });
@@ -1064,7 +1111,11 @@ function eventCard(ev) {
     } catch {}
     loadEvents();
   });
-  const actions = [view, toggle];
+  const actions = [view];
+  /* A stale row cannot be opened or closed: no page links to it, so the switch would only
+     promise something it cannot do. It keeps "See who registered" (so the people can be read
+     and exported) and, when empty, the delete button. */
+  if (isLive) actions.push(toggle);
   if (seats === 0) {   // the server refuses to delete an event that still has sign-ups (they'd cascade)
     const del = el('button', { className: 'btn btn--danger', type: 'button', textContent: 'Delete this event’s sign-up list' });
     del.addEventListener('click', async () => {
@@ -1080,10 +1131,13 @@ function eventCard(ev) {
   return el('section', { className: 'ev-card' }, [
     el('div', { className: 'ev-card-head' }, [
       el('h2', { className: 'ev-name', textContent: ev.title }),
-      el('span', { className: 'ev-badge ' + (closed ? 'ev-badge--closed' : 'ev-badge--open'),
-        textContent: closed ? 'Not taking sign-ups' : 'Taking sign-ups' }),
+      ...(isLive
+        ? [el('span', { className: 'ev-badge ' + (closed ? 'ev-badge--closed' : 'ev-badge--open'),
+            textContent: closed ? 'Not taking sign-ups' : 'Taking sign-ups' })]
+        : [el('span', { className: 'ev-badge ev-badge--stale', textContent: 'No longer on the website' })]),
       el('span', { className: 'ev-seats', textContent: `${seats} registered` + (ev.capacity ? ` of ${ev.capacity} places` : '') }),
     ]),
+    ...(isLive ? [] : [el('p', { className: 'hint', textContent: 'This event has been removed from the website (or its address changed), so nobody can register for it any more. Its sign-ups are kept here until you remove them.' })]),
     el('div', { className: 'ev-actions' }, actions),
     box,
   ]);
@@ -1186,7 +1240,14 @@ async function loadList(flash = null) {
   try { data = await fetch('../api/mailing-list').then((x) => x.json()); }
   catch { list.textContent = 'The email list couldn’t be loaded. Please refresh the page.'; return; }
   list.textContent = '';
-  if (!data.ok) { list.append(el('p', { className: 'empty', textContent: data.error || 'The email list couldn’t be loaded.' })); return; }
+  if (!data.ok) {
+    /* The one state the officer can fix herself. Migration 0006 creates this table; until it
+       has been applied the panel used to say "ask your web person" and stop, which is a dead
+       end when the person reading it IS the web person. The button runs the same idempotent
+       migration endpoint the README documents, then reloads. */
+    if (data.needsSchema) { list.append(schemaCard()); return; }
+    list.append(el('p', { className: 'empty', textContent: data.error || 'The email list couldn’t be loaded.' })); return;
+  }
 
   const people = data.subscribers || [];
   const count = Number(data.count || 0);
@@ -1199,6 +1260,35 @@ async function loadList(flash = null) {
   list.append(addOneCard());
   list.append(importCard());
   list.append(listTable(people, data.truncated));
+}
+
+/* The email list's one-time database setup (migration 0006). Shown only when the list table is
+   missing. It calls the same POST /api/migrate the README documents, which runs every migration
+   in order and is idempotent, then reloads this screen. Before this existed the panel said "ask
+   your web person" and stopped — no amount of clicking could get the feature running. */
+function schemaCard() {
+  const said = el('p', { className: 'status', role: 'status' });
+  const card = el('section', { className: 'ev-card' }, [
+    el('h2', { className: 'ev-name', textContent: 'Set up the email list' }),
+    el('p', { className: 'hint', textContent: 'The email list needs one database table before it can hold anyone. This is a one-time step, and it is safe to run again: it only creates what is missing and never changes or empties a list that already exists.' }),
+  ]);
+  const go = el('button', { className: 'btn btn--primary', type: 'button', textContent: 'Set up the email list' });
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    said.className = 'status';
+    said.textContent = 'Setting it up…';
+    const res = await fetch('../api/migrate', { method: 'POST' }).catch(() => null);
+    const out = res ? await res.json().catch(() => ({})) : {};
+    if (!res || !out.ok) {
+      go.disabled = false;
+      said.className = 'status status--bad';
+      said.textContent = out.error || 'That didn’t work. Please try again, or ask your web person.';
+      return;
+    }
+    loadList({ text: 'The email list is ready. Anyone who signs up for an event from now on is added automatically.', kind: 'good' });
+  });
+  card.append(el('div', { className: 'ev-actions' }, [go]), said);
+  return card;
 }
 
 /* One message to the whole list. functions/api/mailing-list/send.js sends a separate copy to each

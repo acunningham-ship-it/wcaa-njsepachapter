@@ -69,10 +69,24 @@ export function splitPrivateLinks(content) {
    row (title kept in step); turning registration ON for an event reopens it, turning it OFF
    closes it, and a "Close" pressed on the Sign-ups screen is left alone while it stays on.
    Runs BEFORE the commit: if it fails, nothing is saved, rather than a Register button going
-   live in front of an event the database refuses. */
+   live in front of an event the database refuses.
+
+   ⛔ RECONCILED AGAINST THE TABLE, NOT ONLY AGAINST THE PREVIOUS CONTENT. Comparing previous
+   to current catches an event the officer renamed or turned registration off for. It does NOT
+   catch a row orphaned by something that bypassed this endpoint — a developer committed
+   pages.json directly, or an id changed in an older editor — because that row is in neither
+   "before" nor "now". The result is the failure officers actually see: the same event listed
+   twice on the Sign-ups screen, one copy open with nobody on it. So every row that is not on
+   the website now is stale by definition (register.html is generated only for events in the
+   content, so its Register button cannot exist), and is:
+     - deleted when it has no sign-ups (nothing can be lost, and it can never be reached again), or
+     - closed and kept when it has some, so an officer can still read and export those people.
+   The delete re-checks emptiness in the same statement, exactly like /api/events/delete, so an
+   RSVP landing in the gap cannot be cascade-deleted. */
 async function syncRegistration(env, previous, committed, links) {
   const now = registerableEvents(committed);
   const before = previous ? registerableEvents(previous) : {};
+  if (!env.DB) return false;
   const ops = [];
   for (const [id, e] of Object.entries(now)) {
     const title = String(e.title).slice(0, 200);
@@ -80,9 +94,30 @@ async function syncRegistration(env, previous, committed, links) {
       ? ['INSERT INTO events (id, title) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET title = excluded.title', [id, title]]
       : ['INSERT INTO events (id, title, closed) VALUES (?, ?, 0) ON CONFLICT (id) DO UPDATE SET title = excluded.title, closed = 0', [id, title]]);
   }
-  for (const id of Object.keys(before)) {
-    if (!now[id]) ops.push(['UPDATE events SET closed = 1 WHERE id = ?', [id]]);
+
+  /* Every id the site still lists, registration on or off. An event that is on the page but no
+     longer taking sign-ups is NOT stale: its row is kept and closed (below) because the officer
+     may turn registration back on, and because its sign-ups are that event's history. */
+  const onSite = new Set(eventItems(committed).map((e) => e.id).filter((id) => typeof id === 'string' && EVENT_ID.test(id)));
+
+  /* One read of the ids, then one statement per stale row: D1 caps a query at 100 bound
+     parameters, so `id NOT IN (…)` with every live id cannot be built safely. */
+  let existing = [];
+  try {
+    const r = await env.DB.prepare('SELECT id FROM events').all();
+    existing = (r.results || []).map((row) => String(row.id));
+  } catch {
+    return false;   // no events table yet: refuse the save rather than publish a Register button
   }
+  for (const id of existing) {
+    if (!onSite.has(id)) {
+      ops.push(['DELETE FROM events WHERE id = ? AND NOT EXISTS (SELECT 1 FROM rsvps WHERE event_id = ?)', [id, id]]);
+      ops.push(['UPDATE events SET closed = 1 WHERE id = ?', [id]]);   // no-op when the delete fired
+    } else if (!now[id]) {
+      ops.push(['UPDATE events SET closed = 1 WHERE id = ?', [id]]);   // still on the site, registration off
+    }
+  }
+
   for (const [id, url] of links) {
     if (!now[id]) continue;
     ops.push(url
@@ -90,7 +125,6 @@ async function syncRegistration(env, previous, committed, links) {
       : ['DELETE FROM event_links WHERE event_id = ?', [id]]);
   }
   if (!ops.length) return true;
-  if (!env.DB) return false;
   try {
     await env.DB.batch(ops.map(([sql, args]) => env.DB.prepare(sql).bind(...args)));   // one transaction
     return true;

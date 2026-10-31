@@ -441,5 +441,32 @@ const callSave = async (payload, { cookie = COOKIE, env = { ...ENV, DB: makeDB()
   ok('a page with the address “register” is refused', r.status === 400 && gh.commits === 0, r.json);
 }
 
+/* ================= save: rows left behind by a change that bypassed the editor =================
+   THE "HOLIDAY BRUNCH APPEARS TWICE" CASE. Comparing the previous content to the new one catches an
+   event the officer renamed HERE. It cannot catch a row orphaned by a commit made straight to the
+   repo (the 04e6991 case): that row is in neither version of the content, so it survived as an
+   OPEN event with nobody on it for ever, listed next to the real one. */
+{
+  const evItemsOf = (doc) => doc.pages.find((pg) => pg.slug === 'events').sections[0].blocks.find((b) => b.type === 'events').items;
+  const DB = makeDB();
+  const content = clone(REAL_CONTENT);
+  const live = evItemsOf(content).find((e) => e.register === true);
+
+  DB.raw.prepare("INSERT INTO events (id,title,closed) VALUES ('november-1-2026-sunday-holiday-brunch','Holiday Brunch',0)").run();
+  DB.raw.prepare("INSERT INTO events (id,title,closed) VALUES ('old-event-with-signups','Old event',0)").run();
+  DB.raw.prepare('INSERT INTO events (id,title,closed) VALUES (?,?,0)').run(live.id, live.title);
+  DB.raw.prepare("INSERT INTO rsvps (event_id,name,email,email_key) VALUES ('old-event-with-signups','Ada','ada@example.com','ada@example.com')").run();
+
+  resetGH(read('content/pages.json'));
+  const rr = await callSave({ content, site: REAL_SITE }, { env: { ...ENV, DB } });
+  ok('a save succeeds with stale rows present', rr.status === 200, rr.json);
+  ok('a stale EMPTY event row is deleted (the leftover half of a duplicate)',
+     !DB.raw.prepare("SELECT id FROM events WHERE id = 'november-1-2026-sunday-holiday-brunch'").get());
+  ok('  ...a stale row WITH sign-ups is kept and closed, so those people can still be exported',
+     DB.raw.prepare("SELECT closed FROM events WHERE id = 'old-event-with-signups'").get()?.closed === 1);
+  ok('  ...and its sign-ups are untouched', DB.raw.prepare("SELECT COUNT(*) n FROM rsvps WHERE event_id = 'old-event-with-signups'").get().n === 1);
+  ok('  ...while the event that IS on the website stays open', DB.raw.prepare('SELECT closed FROM events WHERE id = ?').get(live.id).closed === 0, live.id);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

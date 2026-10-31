@@ -177,6 +177,7 @@ textarea.input { resize: vertical; }
 .ev-badge { padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 16px; }
 .ev-badge--open { background: var(--green-100); color: #1f5c39; }
 .ev-badge--closed { background: var(--neutral-200); color: var(--neutral-800); }
+.ev-badge--stale { background: var(--red-100); color: var(--red-600); }
 .ev-seats { color: var(--neutral-700); }
 .ev-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--space-4); }
 .ev-rsvps { margin-top: var(--space-5); }

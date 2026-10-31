@@ -40,8 +40,10 @@ export async function onRequest(context) {
       total = c ? Number(c.n) : rows.length;
     } catch {
       /* Not a 500: the officer needs to know WHICH thing is missing, and the answer is a
-         one-time schema update they can apply from this panel (/api/migrate). */
-      return json({ ok: false, error: 'The email list isn’t set up in the database yet. Please ask your web person.' }, 409);
+         one-time schema update they can apply from this panel (/api/migrate). `needsSchema`
+         is what lets the panel show that as a "Set it up" button instead of a dead end. */
+      return json({ ok: false, needsSchema: true,
+        error: 'The email list isn’t set up in the database yet. Please ask your web person.' }, 409);
     }
 
     if (wantCsv) {
